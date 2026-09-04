@@ -214,7 +214,7 @@ class FMSScorer:
         knee_angle = m["kneeAngle"]
         hip_angle = m["hipAngle"]
         trunk_lean = _trunk_lean_deg(frame)
-        knee_track = _max_knee_tracking_error(frame)
+        knee_offset = _knee_medial_offset(frame)
         wrist_height = _mean_y(frame, ["left_wrist", "right_wrist"])
         shoulder_height = _mean_y(frame, ["left_shoulder", "right_shoulder"])
 
@@ -223,10 +223,12 @@ class FMSScorer:
             faults.append("insufficient_depth")
         if trunk_lean > 32:
             faults.append("trunk_leans_forward")
-        if knee_track < -0.18:
+        # Only the medial (valgus) direction is scored. Across the reference
+        # set 17 of 18 squats read lateral, so knees tracking outward is the
+        # normal baseline here rather than a compensation, and any varus cut
+        # would just slice the tail of that distribution at an arbitrary point.
+        if knee_offset > 0.10:
             faults.append("knees_inward_valgus")
-        elif knee_track > 0.28:
-            faults.append("knees_outward_varus")
         if wrist_height is not None and shoulder_height is not None and wrist_height > shoulder_height:
             faults.append("arms_not_maintained_overhead")
 
@@ -237,7 +239,7 @@ class FMSScorer:
             {
                 **m,
                 "trunkLeanDeg": round(trunk_lean, 2),
-                "kneeTrackingError": round(knee_track, 3),
+                "kneeMedialOffset": round(knee_offset, 3),
                 "scoredFrame": frame.frame,
             },
             confidence=_attempt_confidence(frames),
@@ -248,16 +250,16 @@ class FMSScorer:
         m = _base_measurements(frame)
         hip_asym = _abs_lr_diff(frame, "hip")
         knee_asym = _abs_lr_diff(frame, "knee")
-        pelvis_tilt = _pair_tilt_deg(frame, "left_hip", "right_hip")
-        knee_track = abs(_max_knee_tracking_error(frame))
+        pelvis_tilt = _pair_tilt_norm(frame, "left_hip", "right_hip")
+        knee_offset = abs(_knee_medial_offset(frame))
         step_height = _stepping_height(frame)
 
         faults = []
         if step_height < 0.16:
             faults.append("insufficient_step_clearance")
-        if pelvis_tilt > 10:
+        if pelvis_tilt > 0.18:
             faults.append("pelvis_tilt")
-        if knee_track > 0.25:
+        if knee_offset > 0.30:
             faults.append("knee_internal_external_rotation")
         if hip_asym < 12 and knee_asym < 12:
             faults.append("limited_single_leg_motion")
@@ -269,8 +271,8 @@ class FMSScorer:
             {
                 **m,
                 "stepHeightNorm": round(step_height, 3),
-                "pelvisTiltDeg": round(pelvis_tilt, 2),
-                "kneeTrackingErrorAbs": round(knee_track, 3),
+                "pelvisTiltNorm": round(pelvis_tilt, 3),
+                "kneeOffsetAbs": round(knee_offset, 3),
                 "scoredFrame": frame.frame,
             },
             confidence=_attempt_confidence(frames),
@@ -281,18 +283,15 @@ class FMSScorer:
         m = _base_measurements(frame)
         knee_angle = m["kneeAngle"]
         trunk_lean = _trunk_lean_deg(frame)
-        knee_track = abs(_max_knee_tracking_error(frame))
-        pelvis_tilt = _pair_tilt_deg(frame, "left_hip", "right_hip")
 
+        # knee_alignment_compensation and balance_or_pelvis_shift are dropped:
+        # both are frontal-plane quantities and this test is filmed sagittally,
+        # where they are unrecoverable rather than merely noisy. See notAssessed.
         faults = []
         if knee_angle > 125:
             faults.append("insufficient_knee_flexion")
         if trunk_lean > 28:
             faults.append("forward_trunk_lean")
-        if knee_track > 0.24:
-            faults.append("knee_alignment_compensation")
-        if pelvis_tilt > 12:
-            faults.append("balance_or_pelvis_shift")
 
         complete = knee_angle <= 145
         return _score_from_faults(
@@ -301,9 +300,8 @@ class FMSScorer:
             {
                 **m,
                 "trunkLeanDeg": round(trunk_lean, 2),
-                "pelvisTiltDeg": round(pelvis_tilt, 2),
-                "kneeTrackingErrorAbs": round(knee_track, 3),
                 "scoredFrame": frame.frame,
+                "notAssessed": ["knee_alignment_compensation", "balance_or_pelvis_shift"],
             },
             confidence=_attempt_confidence(frames),
         )
@@ -415,8 +413,10 @@ class FMSScorer:
         raised_knee = _angle(frame, f"{raised_side}_knee_angle", 180)
         opposite = "right" if raised_side == "left" else "left"
         opposite_knee = _angle(frame, f"{opposite}_knee_angle", 180)
-        pelvis_tilt = _pair_tilt_deg(frame, "left_hip", "right_hip")
 
+        # pelvis_lift_or_rotation is dropped: the subject is supine and filmed
+        # from the side, so the pelvis L-R axis points at the camera and
+        # obliquity cannot be separated from rotation. See notAssessed.
         faults = []
         if raised_hip > 110:
             faults.append("insufficient_leg_raise")
@@ -424,8 +424,6 @@ class FMSScorer:
             faults.append("same_side_knee_flexion")
         if opposite_knee < 160:
             faults.append("opposite_side_knee_flexion")
-        if pelvis_tilt > 10:
-            faults.append("pelvis_lift_or_rotation")
 
         complete = raised_hip <= 135
         return _score_from_faults(
@@ -436,8 +434,8 @@ class FMSScorer:
                 "raisedHipAngle": round(raised_hip, 2),
                 "raisedKneeAngle": round(raised_knee, 2),
                 "oppositeKneeAngle": round(opposite_knee, 2),
-                "pelvisTiltDeg": round(pelvis_tilt, 2),
                 "scoredFrame": frame.frame,
+                "notAssessed": ["pelvis_lift_or_rotation"],
             },
             confidence=_attempt_confidence(frames),
         )
@@ -475,17 +473,17 @@ class FMSScorer:
     def _score_rotary_stability(self, frames: list[FMSFrame]) -> dict[str, Any]:
         frame = min(frames, key=lambda item: _elbow_knee_distance_norm(item))
         touch_distance = _elbow_knee_distance_norm(frame)
-        shoulder_tilt = _pair_tilt_deg(frame, "left_shoulder", "right_shoulder")
-        pelvis_tilt = _pair_tilt_deg(frame, "left_hip", "right_hip")
-        trunk_rotation = abs(shoulder_tilt - pelvis_tilt)
 
+        # shoulder_or_pelvis_rotation and shoulder_lowering are dropped: both
+        # derive from transverse-segment tilt, which is unrecoverable from the
+        # sagittal view this test is filmed from. The elbow-to-knee touch is
+        # kept because that movement happens in the plane the camera sees.
+        # 0.40 sits in the empty band of the reference distribution: 16 of 18
+        # attempts land at or below 0.284 and the two genuine misses at 0.817.
+        # A tighter cut would clip the top of the successful cluster instead.
         faults = []
-        if touch_distance > 0.35:
+        if touch_distance > 0.40:
             faults.append("fail_to_touch_elbow_to_knee")
-        if trunk_rotation > 18:
-            faults.append("shoulder_or_pelvis_rotation")
-        if shoulder_tilt > 14:
-            faults.append("shoulder_lowering")
 
         complete = touch_distance <= 0.60
         return _score_from_faults(
@@ -493,10 +491,8 @@ class FMSScorer:
             complete,
             {
                 "elbowKneeDistanceNorm": round(touch_distance, 3),
-                "shoulderTiltDeg": round(shoulder_tilt, 2),
-                "pelvisTiltDeg": round(pelvis_tilt, 2),
-                "trunkRotationProxyDeg": round(trunk_rotation, 2),
                 "scoredFrame": frame.frame,
+                "notAssessed": ["shoulder_or_pelvis_rotation", "shoulder_lowering"],
             },
             confidence=_attempt_confidence(frames),
         )
@@ -617,20 +613,20 @@ def _point(frame: FMSFrame, name: str) -> np.ndarray | None:
     return frame.keypoints[idx]
 
 
-def _scale(frame: FMSFrame) -> float:
-    left_hip = _point(frame, "left_hip")
-    right_hip = _point(frame, "right_hip")
-    left_shoulder = _point(frame, "left_shoulder")
-    right_shoulder = _point(frame, "right_shoulder")
-    if left_hip is not None and right_hip is not None:
-        hip_width = np.linalg.norm(left_hip - right_hip)
-    else:
-        hip_width = 0
-    if left_shoulder is not None and right_shoulder is not None:
-        shoulder_width = np.linalg.norm(left_shoulder - right_shoulder)
-    else:
-        shoulder_width = 0
-    return max(float(hip_width), float(shoulder_width), 1.0)
+def _torso_length(frame: FMSFrame) -> float | None:
+    """Shoulder-midpoint to hip-midpoint distance.
+
+    Used as the normalising scale throughout. Unlike hip or shoulder width,
+    the torso runs along the camera's vertical rotation axis, so it barely
+    foreshortens as the subject turns: it stays a stable reference where a
+    transverse width collapses toward zero in a sagittal view.
+    """
+    shoulder_mid = _midpoint(frame, "left_shoulder", "right_shoulder")
+    hip_mid = _midpoint(frame, "left_hip", "right_hip")
+    if shoulder_mid is None or hip_mid is None:
+        return None
+    length = float(np.linalg.norm(shoulder_mid - hip_mid))
+    return length if length > 1e-6 else None
 
 
 def _mean_y(frame: FMSFrame, names: list[str]) -> float | None:
@@ -656,29 +652,70 @@ def _trunk_lean_deg(frame: FMSFrame) -> float:
     return abs(math.degrees(math.acos(cos_a)))
 
 
-def _max_knee_tracking_error(frame: FMSFrame) -> float:
-    errors = []
+def _knee_medial_offset(frame: FMSFrame) -> float:
+    """Knee deviation from the hip-ankle line, normalised by torso length.
+
+    Positive is medial (valgus), negative lateral (varus), signed against the
+    pelvis midline so the sign means the same thing for both legs - raw image
+    x gave opposite signs for the same compensation on left and right.
+
+    The offset is the true perpendicular distance to the hip-ankle line, so it
+    is invariant to in-plane rotation; the previous version compared knee x
+    against the average of hip and ankle x, which only coincides with the line
+    when the leg is vertical in frame.
+
+    FRONTAL VIEWS ONLY. Valgus/varus is a frontal-plane quantity; measured from
+    the side this returns anterior knee travel instead, which is large and
+    normal in a lunge. Callers must not use it for sagittal tests.
+    """
+    left_hip = _point(frame, "left_hip")
+    right_hip = _point(frame, "right_hip")
+    torso = _torso_length(frame)
+    if left_hip is None or right_hip is None or torso is None:
+        return 0.0
+    pelvis_mid = (left_hip + right_hip) / 2.0
+
+    worst = 0.0
     for side in ("left", "right"):
         hip = _point(frame, f"{side}_hip")
         knee = _point(frame, f"{side}_knee")
         ankle = _point(frame, f"{side}_ankle")
         if hip is None or knee is None or ankle is None:
             continue
-        line_x = (hip[0] + ankle[0]) / 2.0
-        errors.append(float((knee[0] - line_x) / _scale(frame)))
-    if not errors:
-        return 0.0
-    return max(errors, key=abs)
+        leg = ankle - hip
+        leg_length = float(np.linalg.norm(leg))
+        if leg_length < 1e-6:
+            continue
+        normal = np.array([-leg[1], leg[0]]) / leg_length
+        offset = float(np.dot(knee - hip, normal))
+        medial_sign = float(np.sign(float(np.dot(pelvis_mid - hip, normal)))) or 1.0
+        value = offset * medial_sign / torso
+        if abs(value) > abs(worst):
+            worst = value
+    return worst
 
 
-def _pair_tilt_deg(frame: FMSFrame, left: str, right: str) -> float:
+def _pair_tilt_norm(frame: FMSFrame, left: str, right: str) -> float:
+    """Obliquity of a transverse segment as vertical offset / torso length.
+
+    For a level camera orbiting the subject, rotation about the world-vertical
+    axis leaves the segment's vertical component unchanged - only its
+    horizontal component foreshortens. Taking dy alone is therefore invariant
+    to viewing azimuth, whereas atan2(dy, dx) tends to 90 degrees as dx
+    collapses, which is what produced 86-degree "pelvis tilt" readings on
+    side-on footage.
+
+    FRONTAL VIEWS ONLY. Stability is not validity: viewed from the side, the
+    pelvis L-R axis points at the camera and obliquity becomes confounded with
+    pelvic rotation, so the number is meaningless regardless of how it is
+    computed. Callers must not use it for sagittal tests.
+    """
     p1 = _point(frame, left)
     p2 = _point(frame, right)
-    if p1 is None or p2 is None:
+    torso = _torso_length(frame)
+    if p1 is None or p2 is None or torso is None:
         return 0.0
-    dx = max(abs(float(p2[0] - p1[0])), 1.0)
-    dy = abs(float(p2[1] - p1[1]))
-    return abs(math.degrees(math.atan2(dy, dx)))
+    return abs(float(p2[1] - p1[1])) / torso
 
 
 def _abs_lr_diff(frame: FMSFrame, joint: str) -> float:
@@ -716,10 +753,28 @@ def _body_line_error(frame: FMSFrame) -> float:
 
 
 def _elbow_knee_distance_norm(frame: FMSFrame) -> float:
+    """Closest elbow-to-knee gap, normalised by upper-arm + thigh length.
+
+    The scale is the two limb segments that actually close the gap. Both are
+    longitudinal, so they hold up in the sagittal view this test is filmed
+    from; the previous transverse normalisation collapsed there and inflated
+    the ratio by roughly 6x, firing the fault on every video.
+
+    Valid from a sagittal view: the elbow-to-knee movement happens largely in
+    the plane the camera sees. Projection can only understate the true 3D gap,
+    so any residual error biases toward reporting a touch, never toward a
+    false fault.
+    """
     distances = []
     for side in ("left", "right"):
+        shoulder = _point(frame, f"{side}_shoulder")
         elbow = _point(frame, f"{side}_elbow")
+        hip = _point(frame, f"{side}_hip")
         knee = _point(frame, f"{side}_knee")
-        if elbow is not None and knee is not None:
-            distances.append(float(np.linalg.norm(elbow - knee) / _scale(frame)))
+        if shoulder is None or elbow is None or hip is None or knee is None:
+            continue
+        scale = float(np.linalg.norm(shoulder - elbow)) + float(np.linalg.norm(hip - knee))
+        if scale < 1e-6:
+            continue
+        distances.append(float(np.linalg.norm(elbow - knee)) / scale)
     return min(distances) if distances else 999.0
