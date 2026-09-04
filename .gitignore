@@ -1,0 +1,36 @@
+runs/
+master/
+job_jpx1yqw1g_optimized_onnx/
+data/
+outputs/
+models/
+SQUATS.docx
+__pycache__/
+ONNX-HRNET-Human-Pose-Estimation/
+data2/
+mockups
+Physio PNG.zip
+/Dataset
+
+# Local environment (6.2 GB)
+.venv/
+
+# Pipeline outputs: tracked pose JSON, reports, plots.
+# Reports are excluded for now because the current all_samples_report.json
+# holds known-invalid scores from the camera-geometry threshold bug.
+fms_outputs/
+fms_outputs_smoke/
+tracked_data/
+
+# Expo/React Native dependencies
+PhysioTracking/node_modules/
+
+# Stale duplicate copy of the whole project nested inside the root (48 MB).
+# Leading slash anchors this to the nested copy only, not the repo root itself.
+/Exercise_Tracking_and_Analysis-main/
+
+# Local Claude Code config
+.claude/
+
+# Third-party paper; linked from the README instead of vendored here
+s41467-020-17807-z.pdf
