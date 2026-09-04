@@ -367,28 +367,36 @@ Folder names are mapped to test ids with `normalize_test_name`, plus a small
 repair step for dataset-specific spellings (`ROTATORY STABILITY`,
 `Incline Lunge`, `Straight Leg Rise`) that would otherwise fail to match.
 
-### Known issue: camera-geometry-dependent thresholds
+### Camera angle: fixed metrics, and two tests that stay provisional
 
-Several scoring rules are 2D and depend on the camera angle the video was shot
-from, and the current thresholds do not appear to match how the `Dataset/`
-videos were filmed. In a full 126-video run, four of the seven tests produced
-degenerate results — the same fault firing on 18/18 videos, or no fault on any
-of them:
+The camera-geometry problem previously documented here is fixed as of commit
+`2a59c37`. Three metrics were rewritten to be robust to the angle the video was
+shot from: transverse-width normalisation (which collapses to near zero when
+the subject is filmed side-on) was replaced with longitudinal normalisation,
+and axis-aligned angle math was replaced with rotation-invariant ratios. See
+`fms_scoring.py` for the current definitions.
 
-- `hurdle_step.pelvisTiltDeg` measured 12.2-30.8 against a `>10` rule (18/18)
-- `inline_lunge.kneeTrackingErrorAbs` measured 1.60-6.85 against `>0.24` (18/18)
-- `rotary_stability.elbowKneeDistanceNorm` measured 0.48-2.47 against `>0.35` (18/18)
-- `trunk_stability_pushup` recorded no faults at all (0/18)
+Some checks could not be fixed, only removed. Valgus and pelvic/shoulder
+obliquity are frontal-plane quantities: filmed from the side, the axis they are
+measured along points at the camera, so the compensation is confounded with
+rotation rather than merely noisy. No 2D formula recovers it. Those checks were
+dropped for the tests filmed sagittally, and each dropped check is listed in
+`measurements.notAssessed` in the scoring output, with the reasoning in the
+commit message for `2a59c37`.
 
-`_pair_tilt_deg` computes the angle between the left and right hip; filmed from
-the side those two points project onto nearly the same `x`, so the angle tends
-toward 90 degrees regardless of real pelvis motion. `_max_knee_tracking_error`
-and `_elbow_knee_distance_norm` have the same sensitivity.
+As a result **inline lunge and rotary stability retain fewer checks than the FMS
+defines**, so most attempts now pass what remains and their scores read high.
+Treat those two as provisional until frontal-camera footage or 3D pose
+estimation is available; they are not clinically meaningful as they stand.
 
-This is pending confirmation. Until the thresholds are validated against the
-camera geometry actually used, treat the per-test scores as provisional. Since
-tracked pose JSON is cached, re-scoring after a rules fix costs seconds per
-video rather than a full re-extraction.
+**Deep squat, hurdle step, and shoulder mobility do not have this limitation** —
+they are filmed frontally, keep their full set of checks, and their scores can
+be read normally.
+
+Because tracked pose JSON is cached, re-scoring after any further rules change
+costs seconds per video rather than a full re-extraction. The scripts in
+`analysis/` reproduce the camera-view classification, the metric distributions,
+and the threshold sweeps that these decisions were based on.
 
 Core dependencies managed via `requirements.txt`:
 - **opencv-python**: Video processing and display
