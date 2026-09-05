@@ -15,10 +15,17 @@ Physio PNG.zip
 # Local environment (6.2 GB)
 .venv/
 
-# Pipeline outputs: tracked pose JSON, reports, plots.
-# Reports are excluded for now because the current all_samples_report.json
-# holds known-invalid scores from the camera-geometry threshold bug.
-fms_outputs/
+# Pipeline outputs. The raw tracked pose JSON is far too large to track
+# (~351 MB), but the final validated report of the 126-video run is kept as
+# the record of that result.
+#
+# Note the shape: git will not re-include a file whose parent directory is
+# excluded, so each level is excluded by contents (dir/*) and re-included in
+# turn rather than excluding the directory itself.
+fms_outputs/*
+!fms_outputs/reports/
+fms_outputs/reports/*
+!fms_outputs/reports/all_samples_report.json
 fms_outputs_smoke/
 tracked_data/
 

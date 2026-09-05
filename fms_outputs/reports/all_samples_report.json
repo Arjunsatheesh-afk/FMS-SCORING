@@ -1,0 +1,3474 @@
+{
+  "dataset": "Dataset",
+  "generatedAt": "2026-09-05T05:52:20.275434+00:00",
+  "mode": "balanced",
+  "device": "cuda",
+  "sampleCount": 18,
+  "queuedVideos": 126,
+  "scoredVideos": 126,
+  "failedVideos": 0,
+  "skippedFolders": 0,
+  "elapsedSec": 11166.7,
+  "summary": {
+    "perExercise": {
+      "deep_squat": {
+        "testName": "Deep Squat",
+        "videos": 18,
+        "scoredVideos": 18,
+        "unscored": 0,
+        "averageScore": 1.94,
+        "distribution": {
+          "0": 0,
+          "1": 8,
+          "2": 3,
+          "3": 7
+        }
+      },
+      "hurdle_step": {
+        "testName": "Hurdle Step",
+        "videos": 18,
+        "scoredVideos": 18,
+        "unscored": 0,
+        "averageScore": 2.39,
+        "distribution": {
+          "0": 0,
+          "1": 0,
+          "2": 11,
+          "3": 7
+        }
+      },
+      "inline_lunge": {
+        "testName": "Inline Lunge",
+        "videos": 18,
+        "scoredVideos": 18,
+        "unscored": 0,
+        "averageScore": 2.94,
+        "distribution": {
+          "0": 0,
+          "1": 0,
+          "2": 1,
+          "3": 17
+        }
+      },
+      "shoulder_mobility": {
+        "testName": "Shoulder Mobility",
+        "videos": 18,
+        "scoredVideos": 18,
+        "unscored": 0,
+        "averageScore": 1.56,
+        "distribution": {
+          "0": 0,
+          "1": 13,
+          "2": 0,
+          "3": 5
+        }
+      },
+      "active_straight_leg_raise": {
+        "testName": "Active Straight-Leg Raise",
+        "videos": 18,
+        "scoredVideos": 18,
+        "unscored": 0,
+        "averageScore": 2.44,
+        "distribution": {
+          "0": 0,
+          "1": 0,
+          "2": 10,
+          "3": 8
+        }
+      },
+      "trunk_stability_pushup": {
+        "testName": "Trunk Stability Push-Up",
+        "videos": 18,
+        "scoredVideos": 18,
+        "unscored": 0,
+        "averageScore": 3.0,
+        "distribution": {
+          "0": 0,
+          "1": 0,
+          "2": 0,
+          "3": 18
+        }
+      },
+      "rotary_stability": {
+        "testName": "Rotary Stability",
+        "videos": 18,
+        "scoredVideos": 18,
+        "unscored": 0,
+        "averageScore": 2.78,
+        "distribution": {
+          "0": 0,
+          "1": 2,
+          "2": 0,
+          "3": 16
+        }
+      }
+    },
+    "overallAverageScore": 2.44,
+    "totalScoredVideos": 126
+  },
+  "results": [
+    {
+      "sampleId": "Sample 1",
+      "sampleNumber": 1,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 80.22,
+        "hipAngle": 95.17,
+        "trunkLeanDeg": 0.84,
+        "kneeMedialOffset": -0.337,
+        "scoredFrame": 656
+      },
+      "confidence": 0.824,
+      "status": "scored",
+      "sourceFolder": "1. DEEP SQUAT",
+      "video": "Dataset\\Sample 1\\1. DEEP SQUAT\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-1.json",
+      "elapsedSec": 54.97
+    },
+    {
+      "sampleId": "Sample 1",
+      "sampleNumber": 1,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "knee_internal_external_rotation"
+      ],
+      "measurements": {
+        "kneeAngle": 101.81,
+        "hipAngle": 102.03,
+        "stepHeightNorm": 0.66,
+        "pelvisTiltNorm": 0.077,
+        "kneeOffsetAbs": 0.33,
+        "scoredFrame": 332
+      },
+      "confidence": 0.798,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 1\\2. HURDLE STEP\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-1.json",
+      "elapsedSec": 140.05
+    },
+    {
+      "sampleId": "Sample 1",
+      "sampleNumber": 1,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 76.0,
+        "hipAngle": 137.18,
+        "trunkLeanDeg": 5.56,
+        "scoredFrame": 1358,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.727,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 1\\3. INLINE LUNGE\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-1.json",
+      "elapsedSec": 125.21
+    },
+    {
+      "sampleId": "Sample 1",
+      "sampleNumber": 1,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 1.62,
+        "bestDistanceHandLengths": 0.2,
+        "topHand": "left",
+        "scoredFrame": 1259,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 3,
+            "distanceIn": 1.62,
+            "distanceHandLengths": 0.2,
+            "scoredFrame": 1259
+          },
+          {
+            "topHand": "right",
+            "score": 3,
+            "distanceIn": 2.02,
+            "distanceHandLengths": 0.25,
+            "scoredFrame": 592
+          }
+        ],
+        "wristDistancePx": 9.13,
+        "shoulderWidthPx": 90.24,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.769,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY",
+      "video": "Dataset\\Sample 1\\4. SHOULDER MOBILITY\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-1.json",
+      "elapsedSec": 140.02
+    },
+    {
+      "sampleId": "Sample 1",
+      "sampleNumber": 1,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 105.25,
+        "raisedKneeAngle": 159.93,
+        "oppositeKneeAngle": 173.76,
+        "scoredFrame": 310,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.781,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE",
+      "video": "Dataset\\Sample 1\\5. ACTIVE STRAIGHT LEG RAISE\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-1.json",
+      "elapsedSec": 84.93
+    },
+    {
+      "sampleId": "Sample 1",
+      "sampleNumber": 1,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.012,
+        "elbowAngle": 36.05,
+        "kneeAngle": 158.51,
+        "scoredFrame": 22
+      },
+      "confidence": 0.82,
+      "status": "scored",
+      "sourceFolder": "6.TRUNK STABILITY PUSH UP",
+      "video": "Dataset\\Sample 1\\6.TRUNK STABILITY PUSH UP\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-1.json",
+      "elapsedSec": 31.72
+    },
+    {
+      "sampleId": "Sample 1",
+      "sampleNumber": 1,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.199,
+        "scoredFrame": 190,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.724,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY",
+      "video": "Dataset\\Sample 1\\7. ROTATORY STABILITY\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-1.json",
+      "elapsedSec": 178.8
+    },
+    {
+      "sampleId": "Sample 2",
+      "sampleNumber": 2,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 38.83,
+        "hipAngle": 48.16,
+        "trunkLeanDeg": 0.09,
+        "kneeMedialOffset": -0.326,
+        "scoredFrame": 712
+      },
+      "confidence": 0.917,
+      "status": "scored",
+      "sourceFolder": "1.Deep squat",
+      "video": "Dataset\\Sample 2\\1.Deep squat\\Deep squat .mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-2.json",
+      "elapsedSec": 80.01
+    },
+    {
+      "sampleId": "Sample 2",
+      "sampleNumber": 2,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 99.27,
+        "hipAngle": 102.9,
+        "stepHeightNorm": 0.578,
+        "pelvisTiltNorm": 0.092,
+        "kneeOffsetAbs": 0.08,
+        "scoredFrame": 285
+      },
+      "confidence": 0.861,
+      "status": "scored",
+      "sourceFolder": "2.Hurdle Step",
+      "video": "Dataset\\Sample 2\\2.Hurdle Step\\Hurdle step.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-2.json",
+      "elapsedSec": 76.0
+    },
+    {
+      "sampleId": "Sample 2",
+      "sampleNumber": 2,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 65.35,
+        "hipAngle": 138.49,
+        "trunkLeanDeg": 1.42,
+        "scoredFrame": 953,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.737,
+      "status": "scored",
+      "sourceFolder": "3.Incline Lunge",
+      "video": "Dataset\\Sample 2\\3.Incline Lunge\\Incline Lunge .mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-2.json",
+      "elapsedSec": 73.1
+    },
+    {
+      "sampleId": "Sample 2",
+      "sampleNumber": 2,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 5.39,
+        "bestDistanceHandLengths": 0.67,
+        "topHand": "left",
+        "scoredFrame": 1471,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 3,
+            "distanceIn": 5.39,
+            "distanceHandLengths": 0.67,
+            "scoredFrame": 1471
+          },
+          {
+            "topHand": "right",
+            "score": 3,
+            "distanceIn": 0.9,
+            "distanceHandLengths": 0.11,
+            "scoredFrame": 937
+          }
+        ],
+        "wristDistancePx": 43.62,
+        "shoulderWidthPx": 129.38,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.854,
+      "status": "scored",
+      "sourceFolder": "4.Shoulder Mobility",
+      "video": "Dataset\\Sample 2\\4.Shoulder Mobility\\5.Shoulder Mobility.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-2.json",
+      "elapsedSec": 181.58
+    },
+    {
+      "sampleId": "Sample 2",
+      "sampleNumber": 2,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 83.17,
+        "raisedKneeAngle": 160.78,
+        "oppositeKneeAngle": 167.91,
+        "scoredFrame": 60,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.76,
+      "status": "scored",
+      "sourceFolder": "5.Active Straight Leg Rise",
+      "video": "Dataset\\Sample 2\\5.Active Straight Leg Rise\\Active straight Leg Rise .mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-2.json",
+      "elapsedSec": 99.12
+    },
+    {
+      "sampleId": "Sample 2",
+      "sampleNumber": 2,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.051,
+        "elbowAngle": 32.37,
+        "kneeAngle": 165.13,
+        "scoredFrame": 196
+      },
+      "confidence": 0.805,
+      "status": "scored",
+      "sourceFolder": "6.Trunk Stability push up",
+      "video": "Dataset\\Sample 2\\6.Trunk Stability push up\\Trunk Stability Push up.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-2.json",
+      "elapsedSec": 60.03
+    },
+    {
+      "sampleId": "Sample 2",
+      "sampleNumber": 2,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.101,
+        "scoredFrame": 104,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.732,
+      "status": "scored",
+      "sourceFolder": "7.Rotatory Stability",
+      "video": "Dataset\\Sample 2\\7.Rotatory Stability\\Rotatory Stability.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-2.json",
+      "elapsedSec": 94.87
+    },
+    {
+      "sampleId": "Sample 3",
+      "sampleNumber": 3,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 101.81,
+        "hipAngle": 110.92,
+        "trunkLeanDeg": 4.03,
+        "kneeMedialOffset": -0.524,
+        "scoredFrame": 183
+      },
+      "confidence": 0.898,
+      "status": "scored",
+      "sourceFolder": "1. DEEP SQUAT",
+      "video": "Dataset\\Sample 3\\1. DEEP SQUAT\\Deep squat.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-3.json",
+      "elapsedSec": 21.38
+    },
+    {
+      "sampleId": "Sample 3",
+      "sampleNumber": 3,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 96.45,
+        "hipAngle": 93.56,
+        "stepHeightNorm": 0.536,
+        "pelvisTiltNorm": 0.103,
+        "kneeOffsetAbs": 0.053,
+        "scoredFrame": 297
+      },
+      "confidence": 0.808,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 3\\2. HURDLE STEP\\Hurdle Step .mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-3.json",
+      "elapsedSec": 34.58
+    },
+    {
+      "sampleId": "Sample 3",
+      "sampleNumber": 3,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 74.87,
+        "hipAngle": 135.5,
+        "trunkLeanDeg": 3.45,
+        "scoredFrame": 291,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.81,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 3\\3. INLINE LUNGE\\Incline Lunge .mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-3.json",
+      "elapsedSec": 28.8
+    },
+    {
+      "sampleId": "Sample 3",
+      "sampleNumber": 3,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 15.7,
+        "bestDistanceHandLengths": 1.96,
+        "topHand": "right",
+        "scoredFrame": 269,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 3,
+            "distanceIn": 2.84,
+            "distanceHandLengths": 0.36,
+            "scoredFrame": 188
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 15.7,
+            "distanceHandLengths": 1.96,
+            "scoredFrame": 269
+          }
+        ],
+        "wristDistancePx": 31.64,
+        "shoulderWidthPx": 32.25,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.84,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY",
+      "video": "Dataset\\Sample 3\\4. SHOULDER MOBILITY\\shoulder mobility.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-3.json",
+      "elapsedSec": 46.16
+    },
+    {
+      "sampleId": "Sample 3",
+      "sampleNumber": 3,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "same_side_knee_flexion"
+      ],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 77.4,
+        "raisedKneeAngle": 90.82,
+        "oppositeKneeAngle": 163.18,
+        "scoredFrame": 252,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.768,
+      "status": "scored",
+      "sourceFolder": "5.ACTIVE STRAIGHT LEG RAISE",
+      "video": "Dataset\\Sample 3\\5.ACTIVE STRAIGHT LEG RAISE\\Active straight Leg Raise.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-3.json",
+      "elapsedSec": 26.83
+    },
+    {
+      "sampleId": "Sample 3",
+      "sampleNumber": 3,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.011,
+        "elbowAngle": 22.13,
+        "kneeAngle": 164.75,
+        "scoredFrame": 15
+      },
+      "confidence": 0.838,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP",
+      "video": "Dataset\\Sample 3\\6. TRUNK STABILITY PUSH UP\\Trunk Stability Push up.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-3.json",
+      "elapsedSec": 19.97
+    },
+    {
+      "sampleId": "Sample 3",
+      "sampleNumber": 3,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.215,
+        "scoredFrame": 185,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.774,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY",
+      "video": "Dataset\\Sample 3\\7. ROTATORY STABILITY\\Rotatory stability.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-3.json",
+      "elapsedSec": 57.31
+    },
+    {
+      "sampleId": "Sample 4",
+      "sampleNumber": 4,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 123.64,
+        "hipAngle": 130.38,
+        "trunkLeanDeg": 1.0,
+        "kneeMedialOffset": -0.354,
+        "scoredFrame": 209
+      },
+      "confidence": 0.891,
+      "status": "scored",
+      "sourceFolder": "1.DEEP SQUAT",
+      "video": "Dataset\\Sample 4\\1.DEEP SQUAT\\Deep squat.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-4.json",
+      "elapsedSec": 35.99
+    },
+    {
+      "sampleId": "Sample 4",
+      "sampleNumber": 4,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 158.17,
+        "hipAngle": 161.15,
+        "stepHeightNorm": 0.444,
+        "pelvisTiltNorm": 0.173,
+        "kneeOffsetAbs": 0.166,
+        "scoredFrame": 12
+      },
+      "confidence": 0.816,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 4\\2. HURDLE STEP\\Hurdle Step.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-4.json",
+      "elapsedSec": 44.89
+    },
+    {
+      "sampleId": "Sample 4",
+      "sampleNumber": 4,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 76.88,
+        "hipAngle": 142.62,
+        "trunkLeanDeg": 1.96,
+        "scoredFrame": 459,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.749,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 4\\3. INLINE LUNGE\\incline Lunge.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-4.json",
+      "elapsedSec": 43.56
+    },
+    {
+      "sampleId": "Sample 4",
+      "sampleNumber": 4,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 13.64,
+        "bestDistanceHandLengths": 1.71,
+        "topHand": "left",
+        "scoredFrame": 620,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 13.64,
+            "distanceHandLengths": 1.71,
+            "scoredFrame": 620
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 19.29,
+            "distanceHandLengths": 2.41,
+            "scoredFrame": 369
+          }
+        ],
+        "wristDistancePx": 27.49,
+        "shoulderWidthPx": 32.24,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.856,
+      "status": "scored",
+      "sourceFolder": "4.SHOULDER MOBILITY",
+      "video": "Dataset\\Sample 4\\4.SHOULDER MOBILITY\\Shoulder mobility.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-4.json",
+      "elapsedSec": 40.99
+    },
+    {
+      "sampleId": "Sample 4",
+      "sampleNumber": 4,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "same_side_knee_flexion"
+      ],
+      "measurements": {
+        "raisedSide": "right",
+        "raisedHipAngle": 87.94,
+        "raisedKneeAngle": 150.07,
+        "oppositeKneeAngle": 171.18,
+        "scoredFrame": 351,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.759,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE",
+      "video": "Dataset\\Sample 4\\5. ACTIVE STRAIGHT LEG RAISE\\Acrive Straight Leg Raise .mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-4.json",
+      "elapsedSec": 48.65
+    },
+    {
+      "sampleId": "Sample 4",
+      "sampleNumber": 4,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.016,
+        "elbowAngle": 35.88,
+        "kneeAngle": 165.14,
+        "scoredFrame": 25
+      },
+      "confidence": 0.842,
+      "status": "scored",
+      "sourceFolder": "6.TRUNK STABILITY PUSH UP",
+      "video": "Dataset\\Sample 4\\6.TRUNK STABILITY PUSH UP\\trunk Stability Push up.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-4.json",
+      "elapsedSec": 29.1
+    },
+    {
+      "sampleId": "Sample 4",
+      "sampleNumber": 4,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.175,
+        "scoredFrame": 795,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.755,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY",
+      "video": "Dataset\\Sample 4\\7. ROTATORY STABILITY\\Rotator stability.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-4.json",
+      "elapsedSec": 78.9
+    },
+    {
+      "sampleId": "Sample 5",
+      "sampleNumber": 5,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 89.92,
+        "hipAngle": 104.02,
+        "trunkLeanDeg": 1.94,
+        "kneeMedialOffset": -0.493,
+        "scoredFrame": 218
+      },
+      "confidence": 0.869,
+      "status": "scored",
+      "sourceFolder": "1. DEEP SQUAT",
+      "video": "Dataset\\Sample 5\\1. DEEP SQUAT\\Deep squat.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-5.json",
+      "elapsedSec": 25.59
+    },
+    {
+      "sampleId": "Sample 5",
+      "sampleNumber": 5,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "knee_internal_external_rotation"
+      ],
+      "measurements": {
+        "kneeAngle": 110.62,
+        "hipAngle": 114.66,
+        "stepHeightNorm": 0.516,
+        "pelvisTiltNorm": 0.145,
+        "kneeOffsetAbs": 0.351,
+        "scoredFrame": 667
+      },
+      "confidence": 0.803,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 5\\2. HURDLE STEP\\Hurdle step.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-5.json",
+      "elapsedSec": 57.4
+    },
+    {
+      "sampleId": "Sample 5",
+      "sampleNumber": 5,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 76.69,
+        "hipAngle": 141.06,
+        "trunkLeanDeg": 3.61,
+        "scoredFrame": 459,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.759,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 5\\3. INLINE LUNGE\\incline Lunge.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-5.json",
+      "elapsedSec": 50.07
+    },
+    {
+      "sampleId": "Sample 5",
+      "sampleNumber": 5,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 21.65,
+        "bestDistanceHandLengths": 2.71,
+        "topHand": "right",
+        "scoredFrame": 524,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 3,
+            "distanceIn": 7.02,
+            "distanceHandLengths": 0.88,
+            "scoredFrame": 17
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 21.65,
+            "distanceHandLengths": 2.71,
+            "scoredFrame": 524
+          }
+        ],
+        "wristDistancePx": 159.17,
+        "shoulderWidthPx": 117.62,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.836,
+      "status": "scored",
+      "sourceFolder": "4.SHOULDER MOBILITY",
+      "video": "Dataset\\Sample 5\\4.SHOULDER MOBILITY\\Shoulder mobility.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-5.json",
+      "elapsedSec": 54.72
+    },
+    {
+      "sampleId": "Sample 5",
+      "sampleNumber": 5,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_leg_raise"
+      ],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 120.17,
+        "raisedKneeAngle": 162.72,
+        "oppositeKneeAngle": 174.79,
+        "scoredFrame": 535,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.762,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE",
+      "video": "Dataset\\Sample 5\\5. ACTIVE STRAIGHT LEG RAISE\\Active straight Leg Raise .mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-5.json",
+      "elapsedSec": 41.54
+    },
+    {
+      "sampleId": "Sample 5",
+      "sampleNumber": 5,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.007,
+        "elbowAngle": 51.78,
+        "kneeAngle": 164.83,
+        "scoredFrame": 7
+      },
+      "confidence": 0.801,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP",
+      "video": "Dataset\\Sample 5\\6. TRUNK STABILITY PUSH UP\\Trunk Stability Push up.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-5.json",
+      "elapsedSec": 28.02
+    },
+    {
+      "sampleId": "Sample 5",
+      "sampleNumber": 5,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.284,
+        "scoredFrame": 754,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.74,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY",
+      "video": "Dataset\\Sample 5\\7. ROTATORY STABILITY\\Rotatory stability.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-5.json",
+      "elapsedSec": 100.72
+    },
+    {
+      "sampleId": "Sample 6",
+      "sampleNumber": 6,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 141.49,
+        "hipAngle": 157.3,
+        "trunkLeanDeg": 0.46,
+        "kneeMedialOffset": -0.119,
+        "scoredFrame": 309
+      },
+      "confidence": 0.828,
+      "status": "scored",
+      "sourceFolder": "1. DEEP SQUAT",
+      "video": "Dataset\\Sample 6\\1. DEEP SQUAT\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-6.json",
+      "elapsedSec": 45.3
+    },
+    {
+      "sampleId": "Sample 6",
+      "sampleNumber": 6,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 106.62,
+        "hipAngle": 103.56,
+        "stepHeightNorm": 0.507,
+        "pelvisTiltNorm": 0.084,
+        "kneeOffsetAbs": 0.112,
+        "scoredFrame": 575
+      },
+      "confidence": 0.823,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 6\\2. HURDLE STEP\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-6.json",
+      "elapsedSec": 84.16
+    },
+    {
+      "sampleId": "Sample 6",
+      "sampleNumber": 6,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 72.82,
+        "hipAngle": 128.88,
+        "trunkLeanDeg": 11.63,
+        "scoredFrame": 900,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.768,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 6\\3. INLINE LUNGE\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-6.json",
+      "elapsedSec": 67.17
+    },
+    {
+      "sampleId": "Sample 6",
+      "sampleNumber": 6,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 19.76,
+        "bestDistanceHandLengths": 2.47,
+        "topHand": "left",
+        "scoredFrame": 90,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 19.76,
+            "distanceHandLengths": 2.47,
+            "scoredFrame": 90
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 18.67,
+            "distanceHandLengths": 2.33,
+            "scoredFrame": 1192
+          }
+        ],
+        "wristDistancePx": 221.36,
+        "shoulderWidthPx": 179.25,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.79,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 6\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-6.json",
+      "elapsedSec": 75.47
+    },
+    {
+      "sampleId": "Sample 6",
+      "sampleNumber": 6,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_leg_raise"
+      ],
+      "measurements": {
+        "raisedSide": "right",
+        "raisedHipAngle": 120.59,
+        "raisedKneeAngle": 158.55,
+        "oppositeKneeAngle": 171.91,
+        "scoredFrame": 554,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.762,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 6\\5. ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-6.json",
+      "elapsedSec": 70.81
+    },
+    {
+      "sampleId": "Sample 6",
+      "sampleNumber": 6,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.01,
+        "elbowAngle": 37.02,
+        "kneeAngle": 160.31,
+        "scoredFrame": 100
+      },
+      "confidence": 0.795,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 6\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-6.json",
+      "elapsedSec": 31.29
+    },
+    {
+      "sampleId": "Sample 6",
+      "sampleNumber": 6,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.072,
+        "scoredFrame": 2499,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.741,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 6\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-6.json",
+      "elapsedSec": 156.05
+    },
+    {
+      "sampleId": "Sample 7",
+      "sampleNumber": 7,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 141.18,
+        "hipAngle": 135.48,
+        "trunkLeanDeg": 0.24,
+        "kneeMedialOffset": -0.259,
+        "scoredFrame": 777
+      },
+      "confidence": 0.838,
+      "status": "scored",
+      "sourceFolder": "1.DEEP SQUAT",
+      "video": "Dataset\\Sample 7\\1.DEEP SQUAT\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-7.json",
+      "elapsedSec": 50.07
+    },
+    {
+      "sampleId": "Sample 7",
+      "sampleNumber": 7,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 127.22,
+        "hipAngle": 114.62,
+        "stepHeightNorm": 0.575,
+        "pelvisTiltNorm": 0.158,
+        "kneeOffsetAbs": 0.028,
+        "scoredFrame": 184
+      },
+      "confidence": 0.842,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 7\\2. HURDLE STEP\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-7.json",
+      "elapsedSec": 96.19
+    },
+    {
+      "sampleId": "Sample 7",
+      "sampleNumber": 7,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 66.16,
+        "hipAngle": 133.75,
+        "trunkLeanDeg": 2.92,
+        "scoredFrame": 590,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.767,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE_",
+      "video": "Dataset\\Sample 7\\3. INLINE LUNGE_\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-7.json",
+      "elapsedSec": 38.48
+    },
+    {
+      "sampleId": "Sample 7",
+      "sampleNumber": 7,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 4.6,
+        "bestDistanceHandLengths": 0.57,
+        "topHand": "left",
+        "scoredFrame": 1397,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 3,
+            "distanceIn": 4.6,
+            "distanceHandLengths": 0.57,
+            "scoredFrame": 1397
+          },
+          {
+            "topHand": "right",
+            "score": 3,
+            "distanceIn": 0.51,
+            "distanceHandLengths": 0.06,
+            "scoredFrame": 181
+          }
+        ],
+        "wristDistancePx": 4.28,
+        "shoulderWidthPx": 14.89,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.844,
+      "status": "scored",
+      "sourceFolder": "4.SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 7\\4.SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-7.json",
+      "elapsedSec": 190.85
+    },
+    {
+      "sampleId": "Sample 7",
+      "sampleNumber": 7,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "same_side_knee_flexion",
+        "opposite_side_knee_flexion"
+      ],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 39.73,
+        "raisedKneeAngle": 42.69,
+        "oppositeKneeAngle": 159.62,
+        "scoredFrame": 1522,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.753,
+      "status": "scored",
+      "sourceFolder": "5.ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 7\\5.ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-7.json",
+      "elapsedSec": 146.32
+    },
+    {
+      "sampleId": "Sample 7",
+      "sampleNumber": 7,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.001,
+        "elbowAngle": 71.99,
+        "kneeAngle": 171.69,
+        "scoredFrame": 613
+      },
+      "confidence": 0.938,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 7\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-7.json",
+      "elapsedSec": 53.54
+    },
+    {
+      "sampleId": "Sample 7",
+      "sampleNumber": 7,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "fail_to_touch_elbow_to_knee"
+      ],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.818,
+        "scoredFrame": 1903,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.844,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 7\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-7.json",
+      "elapsedSec": 190.85
+    },
+    {
+      "sampleId": "Sample 8",
+      "sampleNumber": 8,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 91.16,
+        "hipAngle": 98.21,
+        "trunkLeanDeg": 1.92,
+        "kneeMedialOffset": -0.407,
+        "scoredFrame": 693
+      },
+      "confidence": 0.862,
+      "status": "scored",
+      "sourceFolder": "1.DEEP SQUAT",
+      "video": "Dataset\\Sample 8\\1.DEEP SQUAT\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-8.json",
+      "elapsedSec": 63.74
+    },
+    {
+      "sampleId": "Sample 8",
+      "sampleNumber": 8,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 104.64,
+        "hipAngle": 105.88,
+        "stepHeightNorm": 0.47,
+        "pelvisTiltNorm": 0.091,
+        "kneeOffsetAbs": 0.18,
+        "scoredFrame": 1138
+      },
+      "confidence": 0.803,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP_",
+      "video": "Dataset\\Sample 8\\2. HURDLE STEP_\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-8.json",
+      "elapsedSec": 149.84
+    },
+    {
+      "sampleId": "Sample 8",
+      "sampleNumber": 8,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 73.59,
+        "hipAngle": 121.6,
+        "trunkLeanDeg": 9.75,
+        "scoredFrame": 993,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.726,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE_",
+      "video": "Dataset\\Sample 8\\3. INLINE LUNGE_\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-8.json",
+      "elapsedSec": 101.87
+    },
+    {
+      "sampleId": "Sample 8",
+      "sampleNumber": 8,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 0.18,
+        "bestDistanceHandLengths": 0.02,
+        "topHand": "left",
+        "scoredFrame": 3829,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 3,
+            "distanceIn": 0.18,
+            "distanceHandLengths": 0.02,
+            "scoredFrame": 3829
+          },
+          {
+            "topHand": "right",
+            "score": 3,
+            "distanceIn": 0.66,
+            "distanceHandLengths": 0.08,
+            "scoredFrame": 3975
+          }
+        ],
+        "wristDistancePx": 1.5,
+        "shoulderWidthPx": 137.14,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.822,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 8\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-8.json",
+      "elapsedSec": 356.24
+    },
+    {
+      "sampleId": "Sample 8",
+      "sampleNumber": 8,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "raisedSide": "right",
+        "raisedHipAngle": 100.92,
+        "raisedKneeAngle": 172.14,
+        "oppositeKneeAngle": 173.19,
+        "scoredFrame": 1186,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.701,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 8\\5. ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-8.json",
+      "elapsedSec": 172.08
+    },
+    {
+      "sampleId": "Sample 8",
+      "sampleNumber": 8,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.032,
+        "elbowAngle": 63.64,
+        "kneeAngle": 163.78,
+        "scoredFrame": 3
+      },
+      "confidence": 0.867,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 8\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-8.json",
+      "elapsedSec": 59.04
+    },
+    {
+      "sampleId": "Sample 8",
+      "sampleNumber": 8,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "fail_to_touch_elbow_to_knee"
+      ],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.817,
+        "scoredFrame": 3918,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.822,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 8\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-8.json",
+      "elapsedSec": 329.21
+    },
+    {
+      "sampleId": "Sample 9",
+      "sampleNumber": 9,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 90.0,
+        "hipAngle": 100.66,
+        "trunkLeanDeg": 3.72,
+        "kneeMedialOffset": -0.444,
+        "scoredFrame": 898
+      },
+      "confidence": 0.85,
+      "status": "scored",
+      "sourceFolder": "1.DEEP SQUAT_",
+      "video": "Dataset\\Sample 9\\1.DEEP SQUAT_\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-9.json",
+      "elapsedSec": 80.33
+    },
+    {
+      "sampleId": "Sample 9",
+      "sampleNumber": 9,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "pelvis_tilt",
+        "knee_internal_external_rotation"
+      ],
+      "measurements": {
+        "kneeAngle": 124.64,
+        "hipAngle": 133.5,
+        "stepHeightNorm": 0.482,
+        "pelvisTiltNorm": 0.252,
+        "kneeOffsetAbs": 0.489,
+        "scoredFrame": 198
+      },
+      "confidence": 0.796,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP_",
+      "video": "Dataset\\Sample 9\\2. HURDLE STEP_\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-9.json",
+      "elapsedSec": 98.63
+    },
+    {
+      "sampleId": "Sample 9",
+      "sampleNumber": 9,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 72.92,
+        "hipAngle": 131.09,
+        "trunkLeanDeg": 7.17,
+        "scoredFrame": 616,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.748,
+      "status": "scored",
+      "sourceFolder": "3.INLINE LUNGE_",
+      "video": "Dataset\\Sample 9\\3.INLINE LUNGE_\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-9.json",
+      "elapsedSec": 160.1
+    },
+    {
+      "sampleId": "Sample 9",
+      "sampleNumber": 9,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 18.32,
+        "bestDistanceHandLengths": 2.29,
+        "topHand": "left",
+        "scoredFrame": 1621,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 18.32,
+            "distanceHandLengths": 2.29,
+            "scoredFrame": 1621
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 16.52,
+            "distanceHandLengths": 2.07,
+            "scoredFrame": 210
+          }
+        ],
+        "wristDistancePx": 240.31,
+        "shoulderWidthPx": 209.85,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.839,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 9\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-9.json",
+      "elapsedSec": 225.78
+    },
+    {
+      "sampleId": "Sample 9",
+      "sampleNumber": 9,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "same_side_knee_flexion",
+        "opposite_side_knee_flexion"
+      ],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 101.37,
+        "raisedKneeAngle": 153.12,
+        "oppositeKneeAngle": 103.75,
+        "scoredFrame": 113,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.763,
+      "status": "scored",
+      "sourceFolder": "5.ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 9\\5.ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-9.json",
+      "elapsedSec": 83.23
+    },
+    {
+      "sampleId": "Sample 9",
+      "sampleNumber": 9,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.019,
+        "elbowAngle": 34.48,
+        "kneeAngle": 163.5,
+        "scoredFrame": 336
+      },
+      "confidence": 0.818,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 9\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-9.json",
+      "elapsedSec": 47.68
+    },
+    {
+      "sampleId": "Sample 9",
+      "sampleNumber": 9,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.185,
+        "scoredFrame": 1067,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.737,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 9\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-9.json",
+      "elapsedSec": 163.54
+    },
+    {
+      "sampleId": "Sample 10",
+      "sampleNumber": 10,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 155.37,
+        "hipAngle": 149.09,
+        "trunkLeanDeg": 1.19,
+        "kneeMedialOffset": -0.148,
+        "scoredFrame": 519
+      },
+      "confidence": 0.86,
+      "status": "scored",
+      "sourceFolder": "1.DEEP SQUAT",
+      "video": "Dataset\\Sample 10\\1.DEEP SQUAT\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-10.json",
+      "elapsedSec": 39.78
+    },
+    {
+      "sampleId": "Sample 10",
+      "sampleNumber": 10,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 111.69,
+        "hipAngle": 111.27,
+        "stepHeightNorm": 0.467,
+        "pelvisTiltNorm": 0.158,
+        "kneeOffsetAbs": 0.166,
+        "scoredFrame": 762
+      },
+      "confidence": 0.808,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 10\\2. HURDLE STEP\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-10.json",
+      "elapsedSec": 71.59
+    },
+    {
+      "sampleId": "Sample 10",
+      "sampleNumber": 10,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 75.19,
+        "hipAngle": 126.38,
+        "trunkLeanDeg": 10.09,
+        "scoredFrame": 514,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.756,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 10\\3. INLINE LUNGE\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-10.json",
+      "elapsedSec": 97.69
+    },
+    {
+      "sampleId": "Sample 10",
+      "sampleNumber": 10,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 22.63,
+        "bestDistanceHandLengths": 2.83,
+        "topHand": "left",
+        "scoredFrame": 894,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 22.63,
+            "distanceHandLengths": 2.83,
+            "scoredFrame": 894
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 16.46,
+            "distanceHandLengths": 2.06,
+            "scoredFrame": 273
+          }
+        ],
+        "wristDistancePx": 241.68,
+        "shoulderWidthPx": 170.91,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.832,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 10\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-10.json",
+      "elapsedSec": 206.61
+    },
+    {
+      "sampleId": "Sample 10",
+      "sampleNumber": 10,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "raisedSide": "right",
+        "raisedHipAngle": 101.63,
+        "raisedKneeAngle": 156.96,
+        "oppositeKneeAngle": 172.69,
+        "scoredFrame": 2314,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.743,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 10\\5. ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-10.json",
+      "elapsedSec": 173.05
+    },
+    {
+      "sampleId": "Sample 10",
+      "sampleNumber": 10,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.005,
+        "elbowAngle": 9.62,
+        "kneeAngle": 160.94,
+        "scoredFrame": 921
+      },
+      "confidence": 0.791,
+      "status": "scored",
+      "sourceFolder": "6.TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 10\\6.TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-10.json",
+      "elapsedSec": 79.86
+    },
+    {
+      "sampleId": "Sample 10",
+      "sampleNumber": 10,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.138,
+        "scoredFrame": 1995,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.723,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 10\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-10.json",
+      "elapsedSec": 195.39
+    },
+    {
+      "sampleId": "Sample 11",
+      "sampleNumber": 11,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 148.87,
+        "hipAngle": 155.38,
+        "trunkLeanDeg": 0.44,
+        "kneeMedialOffset": -0.211,
+        "scoredFrame": 664
+      },
+      "confidence": 0.875,
+      "status": "scored",
+      "sourceFolder": "1. DEEP SQUAT_",
+      "video": "Dataset\\Sample 11\\1. DEEP SQUAT_\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-11.json",
+      "elapsedSec": 45.06
+    },
+    {
+      "sampleId": "Sample 11",
+      "sampleNumber": 11,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "pelvis_tilt"
+      ],
+      "measurements": {
+        "kneeAngle": 136.81,
+        "hipAngle": 130.96,
+        "stepHeightNorm": 0.542,
+        "pelvisTiltNorm": 0.261,
+        "kneeOffsetAbs": 0.253,
+        "scoredFrame": 165
+      },
+      "confidence": 0.785,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 11\\2. HURDLE STEP\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-11.json",
+      "elapsedSec": 69.94
+    },
+    {
+      "sampleId": "Sample 11",
+      "sampleNumber": 11,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 87.51,
+        "hipAngle": 128.78,
+        "trunkLeanDeg": 7.62,
+        "scoredFrame": 38,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.782,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 11\\3. INLINE LUNGE\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-11.json",
+      "elapsedSec": 41.64
+    },
+    {
+      "sampleId": "Sample 11",
+      "sampleNumber": 11,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 19.88,
+        "bestDistanceHandLengths": 2.48,
+        "topHand": "left",
+        "scoredFrame": 327,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 19.88,
+            "distanceHandLengths": 2.48,
+            "scoredFrame": 327
+          },
+          {
+            "topHand": "right",
+            "score": 3,
+            "distanceIn": 4.94,
+            "distanceHandLengths": 0.62,
+            "scoredFrame": 155
+          }
+        ],
+        "wristDistancePx": 216.3,
+        "shoulderWidthPx": 174.11,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.875,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 11\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-11.json",
+      "elapsedSec": 120.46
+    },
+    {
+      "sampleId": "Sample 11",
+      "sampleNumber": 11,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "raisedSide": "right",
+        "raisedHipAngle": 88.92,
+        "raisedKneeAngle": 158.23,
+        "oppositeKneeAngle": 170.14,
+        "scoredFrame": 1496,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.769,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 11\\5. ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-11.json",
+      "elapsedSec": 94.53
+    },
+    {
+      "sampleId": "Sample 11",
+      "sampleNumber": 11,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.004,
+        "elbowAngle": 44.9,
+        "kneeAngle": 168.5,
+        "scoredFrame": 313
+      },
+      "confidence": 0.839,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 11\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-11.json",
+      "elapsedSec": 60.99
+    },
+    {
+      "sampleId": "Sample 11",
+      "sampleNumber": 11,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.099,
+        "scoredFrame": 1249,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.794,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 11\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-11.json",
+      "elapsedSec": 106.91
+    },
+    {
+      "sampleId": "Sample 12",
+      "sampleNumber": 12,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.135,
+        "scoredFrame": 2559,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.774,
+      "status": "scored",
+      "sourceFolder": " 7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 12\\ 7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-12.json",
+      "elapsedSec": 168.53
+    },
+    {
+      "sampleId": "Sample 12",
+      "sampleNumber": 12,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth",
+        "knees_inward_valgus"
+      ],
+      "measurements": {
+        "kneeAngle": 169.77,
+        "hipAngle": 164.98,
+        "trunkLeanDeg": 8.88,
+        "kneeMedialOffset": 0.192,
+        "scoredFrame": 348
+      },
+      "confidence": 0.847,
+      "status": "scored",
+      "sourceFolder": "1.DEEP SQUAT",
+      "video": "Dataset\\Sample 12\\1.DEEP SQUAT\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-12.json",
+      "elapsedSec": 80.77
+    },
+    {
+      "sampleId": "Sample 12",
+      "sampleNumber": 12,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "knee_internal_external_rotation"
+      ],
+      "measurements": {
+        "kneeAngle": 137.09,
+        "hipAngle": 147.18,
+        "stepHeightNorm": 0.421,
+        "pelvisTiltNorm": 0.165,
+        "kneeOffsetAbs": 0.38,
+        "scoredFrame": 737
+      },
+      "confidence": 0.787,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 12\\2. HURDLE STEP\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-12.json",
+      "elapsedSec": 97.27
+    },
+    {
+      "sampleId": "Sample 12",
+      "sampleNumber": 12,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 66.82,
+        "hipAngle": 127.56,
+        "trunkLeanDeg": 11.61,
+        "scoredFrame": 918,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.71,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 12\\3. INLINE LUNGE\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-12.json",
+      "elapsedSec": 88.82
+    },
+    {
+      "sampleId": "Sample 12",
+      "sampleNumber": 12,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 3.69,
+        "bestDistanceHandLengths": 0.46,
+        "topHand": "left",
+        "scoredFrame": 169,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 3,
+            "distanceIn": 3.69,
+            "distanceHandLengths": 0.46,
+            "scoredFrame": 169
+          },
+          {
+            "topHand": "right",
+            "score": 3,
+            "distanceIn": 1.52,
+            "distanceHandLengths": 0.19,
+            "scoredFrame": 1101
+          }
+        ],
+        "wristDistancePx": 29.78,
+        "shoulderWidthPx": 129.18,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.84,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 12\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-12.json",
+      "elapsedSec": 164.66
+    },
+    {
+      "sampleId": "Sample 12",
+      "sampleNumber": 12,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "opposite_side_knee_flexion"
+      ],
+      "measurements": {
+        "raisedSide": "right",
+        "raisedHipAngle": 102.94,
+        "raisedKneeAngle": 176.72,
+        "oppositeKneeAngle": 147.69,
+        "scoredFrame": 50,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.729,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 12\\5. ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-12.json",
+      "elapsedSec": 104.0
+    },
+    {
+      "sampleId": "Sample 12",
+      "sampleNumber": 12,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.01,
+        "elbowAngle": 66.09,
+        "kneeAngle": 163.54,
+        "scoredFrame": 74
+      },
+      "confidence": 0.844,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 12\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-12.json",
+      "elapsedSec": 60.45
+    },
+    {
+      "sampleId": "Sample 13",
+      "sampleNumber": 13,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 104.8,
+        "hipAngle": 101.72,
+        "trunkLeanDeg": 0.32,
+        "kneeMedialOffset": -0.318,
+        "scoredFrame": 422
+      },
+      "confidence": 0.839,
+      "status": "scored",
+      "sourceFolder": "1. DEEP SQUAT_",
+      "video": "Dataset\\Sample 13\\1. DEEP SQUAT_\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-13.json",
+      "elapsedSec": 74.66
+    },
+    {
+      "sampleId": "Sample 13",
+      "sampleNumber": 13,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "pelvis_tilt"
+      ],
+      "measurements": {
+        "kneeAngle": 135.97,
+        "hipAngle": 140.88,
+        "stepHeightNorm": 0.504,
+        "pelvisTiltNorm": 0.219,
+        "kneeOffsetAbs": 0.271,
+        "scoredFrame": 481
+      },
+      "confidence": 0.831,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP",
+      "video": "Dataset\\Sample 13\\2. HURDLE STEP\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-13.json",
+      "elapsedSec": 112.76
+    },
+    {
+      "sampleId": "Sample 13",
+      "sampleNumber": 13,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 78.62,
+        "hipAngle": 131.71,
+        "trunkLeanDeg": 4.99,
+        "scoredFrame": 489,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.755,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE",
+      "video": "Dataset\\Sample 13\\3. INLINE LUNGE\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-13.json",
+      "elapsedSec": 62.9
+    },
+    {
+      "sampleId": "Sample 13",
+      "sampleNumber": 13,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 16.11,
+        "bestDistanceHandLengths": 2.01,
+        "topHand": "right",
+        "scoredFrame": 1904,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 3,
+            "distanceIn": 0.65,
+            "distanceHandLengths": 0.08,
+            "scoredFrame": 1903
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 16.11,
+            "distanceHandLengths": 2.01,
+            "scoredFrame": 1904
+          }
+        ],
+        "wristDistancePx": 103.34,
+        "shoulderWidthPx": 102.66,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.884,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 13\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-13.json",
+      "elapsedSec": 143.12
+    },
+    {
+      "sampleId": "Sample 13",
+      "sampleNumber": 13,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "same_side_knee_flexion",
+        "opposite_side_knee_flexion"
+      ],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 85.72,
+        "raisedKneeAngle": 66.6,
+        "oppositeKneeAngle": 141.77,
+        "scoredFrame": 1253,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.73,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 13\\5. ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-13.json",
+      "elapsedSec": 139.14
+    },
+    {
+      "sampleId": "Sample 13",
+      "sampleNumber": 13,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.005,
+        "elbowAngle": 19.18,
+        "kneeAngle": 159.36,
+        "scoredFrame": 65
+      },
+      "confidence": 0.814,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 13\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-13.json",
+      "elapsedSec": 82.8
+    },
+    {
+      "sampleId": "Sample 13",
+      "sampleNumber": 13,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.141,
+        "scoredFrame": 758,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.786,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 13\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-13.json",
+      "elapsedSec": 205.14
+    },
+    {
+      "sampleId": "Sample 14",
+      "sampleNumber": 14,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 144.39,
+        "hipAngle": 160.0,
+        "trunkLeanDeg": 3.22,
+        "kneeMedialOffset": -0.143,
+        "scoredFrame": 358
+      },
+      "confidence": 0.899,
+      "status": "scored",
+      "sourceFolder": "1.Deep squat",
+      "video": "Dataset\\Sample 14\\1.Deep squat\\Deep squat.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-14.json",
+      "elapsedSec": 25.77
+    },
+    {
+      "sampleId": "Sample 14",
+      "sampleNumber": 14,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "knee_internal_external_rotation"
+      ],
+      "measurements": {
+        "kneeAngle": 106.69,
+        "hipAngle": 104.22,
+        "stepHeightNorm": 0.563,
+        "pelvisTiltNorm": 0.125,
+        "kneeOffsetAbs": 0.412,
+        "scoredFrame": 397
+      },
+      "confidence": 0.804,
+      "status": "scored",
+      "sourceFolder": "2.Hurdle Step",
+      "video": "Dataset\\Sample 14\\2.Hurdle Step\\Hurdle Step.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-14.json",
+      "elapsedSec": 33.72
+    },
+    {
+      "sampleId": "Sample 14",
+      "sampleNumber": 14,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 63.48,
+        "hipAngle": 113.12,
+        "trunkLeanDeg": 15.39,
+        "scoredFrame": 370,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.756,
+      "status": "scored",
+      "sourceFolder": "3.Incline Lunge",
+      "video": "Dataset\\Sample 14\\3.Incline Lunge\\Incline Lunge.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-14.json",
+      "elapsedSec": 35.98
+    },
+    {
+      "sampleId": "Sample 14",
+      "sampleNumber": 14,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 12.29,
+        "bestDistanceHandLengths": 1.54,
+        "topHand": "left",
+        "scoredFrame": 646,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 12.29,
+            "distanceHandLengths": 1.54,
+            "scoredFrame": 646
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 18.85,
+            "distanceHandLengths": 2.36,
+            "scoredFrame": 1
+          }
+        ],
+        "wristDistancePx": 18.86,
+        "shoulderWidthPx": 24.55,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.854,
+      "status": "scored",
+      "sourceFolder": "4.Shoulder Mobility",
+      "video": "Dataset\\Sample 14\\4.Shoulder Mobility\\Shoulder Mobility.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-14.json",
+      "elapsedSec": 36.16
+    },
+    {
+      "sampleId": "Sample 14",
+      "sampleNumber": 14,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 89.41,
+        "raisedKneeAngle": 168.36,
+        "oppositeKneeAngle": 169.89,
+        "scoredFrame": 281,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.776,
+      "status": "scored",
+      "sourceFolder": "5.Active Straight Leg Raise",
+      "video": "Dataset\\Sample 14\\5.Active Straight Leg Raise\\Active Straight Leg Raise.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-14.json",
+      "elapsedSec": 32.99
+    },
+    {
+      "sampleId": "Sample 14",
+      "sampleNumber": 14,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.015,
+        "elbowAngle": 22.19,
+        "kneeAngle": 167.35,
+        "scoredFrame": 41
+      },
+      "confidence": 0.818,
+      "status": "scored",
+      "sourceFolder": "6.Trunk stability Push up",
+      "video": "Dataset\\Sample 14\\6.Trunk stability Push up\\Trunk Stability Push up.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-14.json",
+      "elapsedSec": 19.77
+    },
+    {
+      "sampleId": "Sample 14",
+      "sampleNumber": 14,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.199,
+        "scoredFrame": 529,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.757,
+      "status": "scored",
+      "sourceFolder": "7.Rotatory stability",
+      "video": "Dataset\\Sample 14\\7.Rotatory stability\\Rotatory Stablility.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-14.json",
+      "elapsedSec": 52.92
+    },
+    {
+      "sampleId": "Sample 15",
+      "sampleNumber": 15,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 119.62,
+        "hipAngle": 125.38,
+        "trunkLeanDeg": 0.02,
+        "kneeMedialOffset": -0.369,
+        "scoredFrame": 334
+      },
+      "confidence": 0.953,
+      "status": "scored",
+      "sourceFolder": "1.Deep squat",
+      "video": "Dataset\\Sample 15\\1.Deep squat\\Deep squat .mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-15.json",
+      "elapsedSec": 29.86
+    },
+    {
+      "sampleId": "Sample 15",
+      "sampleNumber": 15,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "knee_internal_external_rotation"
+      ],
+      "measurements": {
+        "kneeAngle": 111.96,
+        "hipAngle": 110.59,
+        "stepHeightNorm": 0.583,
+        "pelvisTiltNorm": 0.164,
+        "kneeOffsetAbs": 0.455,
+        "scoredFrame": 60
+      },
+      "confidence": 0.911,
+      "status": "scored",
+      "sourceFolder": "2.Hurdle step",
+      "video": "Dataset\\Sample 15\\2.Hurdle step\\Hurdle Step .mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-15.json",
+      "elapsedSec": 35.77
+    },
+    {
+      "sampleId": "Sample 15",
+      "sampleNumber": 15,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 64.64,
+        "hipAngle": 122.95,
+        "trunkLeanDeg": 7.0,
+        "scoredFrame": 194,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.844,
+      "status": "scored",
+      "sourceFolder": "3.Incline Lunge",
+      "video": "Dataset\\Sample 15\\3.Incline Lunge\\Incline Lunge .mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-15.json",
+      "elapsedSec": 81.32
+    },
+    {
+      "sampleId": "Sample 15",
+      "sampleNumber": 15,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 22.68,
+        "bestDistanceHandLengths": 2.84,
+        "topHand": "left",
+        "scoredFrame": 789,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 22.68,
+            "distanceHandLengths": 2.84,
+            "scoredFrame": 789
+          },
+          {
+            "topHand": "right",
+            "score": 2,
+            "distanceIn": 10.58,
+            "distanceHandLengths": 1.32,
+            "scoredFrame": 0
+          }
+        ],
+        "wristDistancePx": 131.59,
+        "shoulderWidthPx": 92.81,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.895,
+      "status": "scored",
+      "sourceFolder": "4.Shoulder Mobility",
+      "video": "Dataset\\Sample 15\\4.Shoulder Mobility\\Shoulder Stability.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-15.json",
+      "elapsedSec": 77.18
+    },
+    {
+      "sampleId": "Sample 15",
+      "sampleNumber": 15,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 90.84,
+        "raisedKneeAngle": 160.55,
+        "oppositeKneeAngle": 178.0,
+        "scoredFrame": 395,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.759,
+      "status": "scored",
+      "sourceFolder": "5.Active Straight Leg Raise",
+      "video": "Dataset\\Sample 15\\5.Active Straight Leg Raise\\Active Straight Leg Raise.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-15.json",
+      "elapsedSec": 43.07
+    },
+    {
+      "sampleId": "Sample 15",
+      "sampleNumber": 15,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.038,
+        "elbowAngle": 36.58,
+        "kneeAngle": 168.12,
+        "scoredFrame": 351
+      },
+      "confidence": 0.908,
+      "status": "scored",
+      "sourceFolder": "6.Trunk Stability Push up",
+      "video": "Dataset\\Sample 15\\6.Trunk Stability Push up\\Trunk Stability Push Up.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-15.json",
+      "elapsedSec": 32.43
+    },
+    {
+      "sampleId": "Sample 15",
+      "sampleNumber": 15,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.068,
+        "scoredFrame": 387,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.772,
+      "status": "scored",
+      "sourceFolder": "7.Rotatory Stability",
+      "video": "Dataset\\Sample 15\\7.Rotatory Stability\\Rotatory Stability.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-15.json",
+      "elapsedSec": 87.4
+    },
+    {
+      "sampleId": "Sample 16",
+      "sampleNumber": 16,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 158.92,
+        "hipAngle": 157.1,
+        "trunkLeanDeg": 1.09,
+        "kneeMedialOffset": -0.169,
+        "scoredFrame": 457
+      },
+      "confidence": 0.872,
+      "status": "scored",
+      "sourceFolder": "1. Deep squat",
+      "video": "Dataset\\Sample 16\\1. Deep squat\\Deep squat.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-16.json",
+      "elapsedSec": 50.18
+    },
+    {
+      "sampleId": "Sample 16",
+      "sampleNumber": 16,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "pelvis_tilt",
+        "knee_internal_external_rotation"
+      ],
+      "measurements": {
+        "kneeAngle": 145.07,
+        "hipAngle": 136.75,
+        "stepHeightNorm": 0.443,
+        "pelvisTiltNorm": 0.201,
+        "kneeOffsetAbs": 0.366,
+        "scoredFrame": 735
+      },
+      "confidence": 0.819,
+      "status": "scored",
+      "sourceFolder": "2.Hurdle Step",
+      "video": "Dataset\\Sample 16\\2.Hurdle Step\\Hurdle Step.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-16.json",
+      "elapsedSec": 49.79
+    },
+    {
+      "sampleId": "Sample 16",
+      "sampleNumber": 16,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 60.13,
+        "hipAngle": 96.31,
+        "trunkLeanDeg": 27.07,
+        "scoredFrame": 167,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.746,
+      "status": "scored",
+      "sourceFolder": "3.Incline Lunge",
+      "video": "Dataset\\Sample 16\\3.Incline Lunge\\Incline Lunge .mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-16.json",
+      "elapsedSec": 42.36
+    },
+    {
+      "sampleId": "Sample 16",
+      "sampleNumber": 16,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 20.72,
+        "bestDistanceHandLengths": 2.59,
+        "topHand": "left",
+        "scoredFrame": 818,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 20.72,
+            "distanceHandLengths": 2.59,
+            "scoredFrame": 818
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 14.87,
+            "distanceHandLengths": 1.86,
+            "scoredFrame": 837
+          }
+        ],
+        "wristDistancePx": 130.67,
+        "shoulderWidthPx": 100.89,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.877,
+      "status": "scored",
+      "sourceFolder": "4.Shoulder Mobility",
+      "video": "Dataset\\Sample 16\\4.Shoulder Mobility\\shoulder Mobility.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-16.json",
+      "elapsedSec": 46.22
+    },
+    {
+      "sampleId": "Sample 16",
+      "sampleNumber": 16,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "opposite_side_knee_flexion"
+      ],
+      "measurements": {
+        "raisedSide": "right",
+        "raisedHipAngle": 90.06,
+        "raisedKneeAngle": 167.55,
+        "oppositeKneeAngle": 148.25,
+        "scoredFrame": 301,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.798,
+      "status": "scored",
+      "sourceFolder": "5.Active Straight Leg Raise",
+      "video": "Dataset\\Sample 16\\5.Active Straight Leg Raise\\Active Straight Leg Raise.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-16.json",
+      "elapsedSec": 40.56
+    },
+    {
+      "sampleId": "Sample 16",
+      "sampleNumber": 16,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.006,
+        "elbowAngle": 29.42,
+        "kneeAngle": 164.84,
+        "scoredFrame": 303
+      },
+      "confidence": 0.852,
+      "status": "scored",
+      "sourceFolder": "6.Trunk Stability  Push up",
+      "video": "Dataset\\Sample 16\\6.Trunk Stability  Push up\\Trunk Stability Push Up.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-16.json",
+      "elapsedSec": 26.45
+    },
+    {
+      "sampleId": "Sample 16",
+      "sampleNumber": 16,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.234,
+        "scoredFrame": 586,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.782,
+      "status": "scored",
+      "sourceFolder": "7.Rotatory Stability",
+      "video": "Dataset\\Sample 16\\7.Rotatory Stability\\Rotatory Stability.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-16.json",
+      "elapsedSec": 60.31
+    },
+    {
+      "sampleId": "Sample 17",
+      "sampleNumber": 17,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 136.02,
+        "hipAngle": 136.98,
+        "trunkLeanDeg": 4.2,
+        "kneeMedialOffset": -0.256,
+        "scoredFrame": 785
+      },
+      "confidence": 0.844,
+      "status": "scored",
+      "sourceFolder": "1.DEEP SQUAT_",
+      "video": "Dataset\\Sample 17\\1.DEEP SQUAT_\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-17.json",
+      "elapsedSec": 56.06
+    },
+    {
+      "sampleId": "Sample 17",
+      "sampleNumber": 17,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "knee_internal_external_rotation"
+      ],
+      "measurements": {
+        "kneeAngle": 106.78,
+        "hipAngle": 106.78,
+        "stepHeightNorm": 0.571,
+        "pelvisTiltNorm": 0.177,
+        "kneeOffsetAbs": 0.343,
+        "scoredFrame": 900
+      },
+      "confidence": 0.835,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP_",
+      "video": "Dataset\\Sample 17\\2. HURDLE STEP_\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-17.json",
+      "elapsedSec": 88.74
+    },
+    {
+      "sampleId": "Sample 17",
+      "sampleNumber": 17,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "kneeAngle": 72.66,
+        "hipAngle": 141.36,
+        "trunkLeanDeg": 0.36,
+        "scoredFrame": 1119,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.778,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE_",
+      "video": "Dataset\\Sample 17\\3. INLINE LUNGE_\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-17.json",
+      "elapsedSec": 88.77
+    },
+    {
+      "sampleId": "Sample 17",
+      "sampleNumber": 17,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 21.49,
+        "bestDistanceHandLengths": 2.69,
+        "topHand": "left",
+        "scoredFrame": 302,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 21.49,
+            "distanceHandLengths": 2.69,
+            "scoredFrame": 302
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 24.13,
+            "distanceHandLengths": 3.02,
+            "scoredFrame": 823
+          }
+        ],
+        "wristDistancePx": 196.74,
+        "shoulderWidthPx": 146.45,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.896,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 17\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-17.json",
+      "elapsedSec": 185.2
+    },
+    {
+      "sampleId": "Sample 17",
+      "sampleNumber": 17,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "raisedSide": "left",
+        "raisedHipAngle": 89.92,
+        "raisedKneeAngle": 169.01,
+        "oppositeKneeAngle": 163.76,
+        "scoredFrame": 603,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.779,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 17\\5. ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-17.json",
+      "elapsedSec": 143.54
+    },
+    {
+      "sampleId": "Sample 17",
+      "sampleNumber": 17,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.014,
+        "elbowAngle": 31.54,
+        "kneeAngle": 163.91,
+        "scoredFrame": 319
+      },
+      "confidence": 0.854,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 17\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-17.json",
+      "elapsedSec": 64.57
+    },
+    {
+      "sampleId": "Sample 17",
+      "sampleNumber": 17,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.246,
+        "scoredFrame": 127,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.756,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 17\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-17.json",
+      "elapsedSec": 104.22
+    },
+    {
+      "sampleId": "Sample 18",
+      "sampleNumber": 18,
+      "test_id": "deep_squat",
+      "testName": "Deep Squat",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "insufficient_depth"
+      ],
+      "measurements": {
+        "kneeAngle": 147.33,
+        "hipAngle": 148.7,
+        "trunkLeanDeg": 2.94,
+        "kneeMedialOffset": -0.224,
+        "scoredFrame": 270
+      },
+      "confidence": 0.873,
+      "status": "scored",
+      "sourceFolder": "1. DEEP SQUAT_",
+      "video": "Dataset\\Sample 18\\1. DEEP SQUAT_\\1.mp4",
+      "trackedJson": "fms_outputs\\tracked\\deep_squat\\Sample-18.json",
+      "elapsedSec": 68.44
+    },
+    {
+      "sampleId": "Sample 18",
+      "sampleNumber": 18,
+      "test_id": "hurdle_step",
+      "testName": "Hurdle Step",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "pelvis_tilt"
+      ],
+      "measurements": {
+        "kneeAngle": 110.84,
+        "hipAngle": 125.17,
+        "stepHeightNorm": 0.525,
+        "pelvisTiltNorm": 0.206,
+        "kneeOffsetAbs": 0.094,
+        "scoredFrame": 154
+      },
+      "confidence": 0.833,
+      "status": "scored",
+      "sourceFolder": "2. HURDLE STEP_",
+      "video": "Dataset\\Sample 18\\2. HURDLE STEP_\\2.mp4",
+      "trackedJson": "fms_outputs\\tracked\\hurdle_step\\Sample-18.json",
+      "elapsedSec": 119.5
+    },
+    {
+      "sampleId": "Sample 18",
+      "sampleNumber": 18,
+      "test_id": "inline_lunge",
+      "testName": "Inline Lunge",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "forward_trunk_lean"
+      ],
+      "measurements": {
+        "kneeAngle": 72.38,
+        "hipAngle": 106.25,
+        "trunkLeanDeg": 28.49,
+        "scoredFrame": 884,
+        "notAssessed": [
+          "knee_alignment_compensation",
+          "balance_or_pelvis_shift"
+        ]
+      },
+      "confidence": 0.77,
+      "status": "scored",
+      "sourceFolder": "3. INLINE LUNGE_",
+      "video": "Dataset\\Sample 18\\3. INLINE LUNGE_\\3.mp4",
+      "trackedJson": "fms_outputs\\tracked\\inline_lunge\\Sample-18.json",
+      "elapsedSec": 175.43
+    },
+    {
+      "sampleId": "Sample 18",
+      "sampleNumber": 18,
+      "test_id": "shoulder_mobility",
+      "testName": "Shoulder Mobility",
+      "score": 1,
+      "maxScore": 3,
+      "faults": [
+        "hands_more_than_one_and_half_hand_lengths_apart"
+      ],
+      "measurements": {
+        "handLengthIn": 8.0,
+        "shoulderWidthIn": 16.0,
+        "bestDistanceIn": 17.25,
+        "bestDistanceHandLengths": 2.16,
+        "topHand": "left",
+        "scoredFrame": 366,
+        "sideResults": [
+          {
+            "topHand": "left",
+            "score": 1,
+            "distanceIn": 17.25,
+            "distanceHandLengths": 2.16,
+            "scoredFrame": 366
+          },
+          {
+            "topHand": "right",
+            "score": 1,
+            "distanceIn": 17.26,
+            "distanceHandLengths": 2.16,
+            "scoredFrame": 364
+          }
+        ],
+        "wristDistancePx": 163.44,
+        "shoulderWidthPx": 151.57,
+        "note": "Uses wrist-to-wrist distance as a camera proxy for closest fist-to-fist distance."
+      },
+      "confidence": 0.885,
+      "status": "scored",
+      "sourceFolder": "4. SHOULDER MOBILITY_",
+      "video": "Dataset\\Sample 18\\4. SHOULDER MOBILITY_\\4.mp4",
+      "trackedJson": "fms_outputs\\tracked\\shoulder_mobility\\Sample-18.json",
+      "elapsedSec": 126.17
+    },
+    {
+      "sampleId": "Sample 18",
+      "sampleNumber": 18,
+      "test_id": "active_straight_leg_raise",
+      "testName": "Active Straight-Leg Raise",
+      "score": 2,
+      "maxScore": 3,
+      "faults": [
+        "same_side_knee_flexion",
+        "opposite_side_knee_flexion"
+      ],
+      "measurements": {
+        "raisedSide": "right",
+        "raisedHipAngle": 77.25,
+        "raisedKneeAngle": 130.19,
+        "oppositeKneeAngle": 71.14,
+        "scoredFrame": 636,
+        "notAssessed": [
+          "pelvis_lift_or_rotation"
+        ]
+      },
+      "confidence": 0.741,
+      "status": "scored",
+      "sourceFolder": "5. ACTIVE STRAIGHT LEG RAISE_",
+      "video": "Dataset\\Sample 18\\5. ACTIVE STRAIGHT LEG RAISE_\\5.mp4",
+      "trackedJson": "fms_outputs\\tracked\\active_straight_leg_raise\\Sample-18.json",
+      "elapsedSec": 64.9
+    },
+    {
+      "sampleId": "Sample 18",
+      "sampleNumber": 18,
+      "test_id": "trunk_stability_pushup",
+      "testName": "Trunk Stability Push-Up",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "bodyLineErrorNorm": 0.019,
+        "elbowAngle": 37.08,
+        "kneeAngle": 162.5,
+        "scoredFrame": 317
+      },
+      "confidence": 0.814,
+      "status": "scored",
+      "sourceFolder": "6. TRUNK STABILITY PUSH UP_",
+      "video": "Dataset\\Sample 18\\6. TRUNK STABILITY PUSH UP_\\6.mp4",
+      "trackedJson": "fms_outputs\\tracked\\trunk_stability_pushup\\Sample-18.json",
+      "elapsedSec": 63.94
+    },
+    {
+      "sampleId": "Sample 18",
+      "sampleNumber": 18,
+      "test_id": "rotary_stability",
+      "testName": "Rotary Stability",
+      "score": 3,
+      "maxScore": 3,
+      "faults": [],
+      "measurements": {
+        "elbowKneeDistanceNorm": 0.197,
+        "scoredFrame": 2377,
+        "notAssessed": [
+          "shoulder_or_pelvis_rotation",
+          "shoulder_lowering"
+        ]
+      },
+      "confidence": 0.754,
+      "status": "scored",
+      "sourceFolder": "7. ROTATORY STABILITY_",
+      "video": "Dataset\\Sample 18\\7. ROTATORY STABILITY_\\7.mp4",
+      "trackedJson": "fms_outputs\\tracked\\rotary_stability\\Sample-18.json",
+      "elapsedSec": 165.01
+    }
+  ],
+  "failures": [],
+  "skipped": []
+}
