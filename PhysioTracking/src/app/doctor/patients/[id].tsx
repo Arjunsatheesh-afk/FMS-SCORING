@@ -15,6 +15,7 @@ import {
   scoreColor,
   statusLabel,
 } from '@/lib/fms';
+import { useAuthedVideoSource } from '@/lib/use-authed-video-source';
 import { AuthUser } from '@/types/auth';
 import { StoredResult } from '@/types/analysis';
 
@@ -58,15 +59,15 @@ export default function PatientDetailScreen() {
   // inside the results.map(), and only one video is visible at a time anyway.
   const openRow = results.find((row) => row.id === expanded) ?? null;
   const hasVideo = Boolean(openRow?.result?.annotatedVideo);
-  const videoSource =
-    openRow && hasVideo && token
-      ? {
-          uri: `${API_BASE_URL}/results/${openRow.jobId}/video`,
-          // The route is doctor-only and ownership-checked, so the player has
-          // to present the same bearer token the rest of the app uses.
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      : null;
+  const videoUrl =
+    openRow && hasVideo ? `${API_BASE_URL}/results/${openRow.jobId}/video` : null;
+
+  // The route is doctor-only and ownership-checked; this carries the bearer
+  // token in the way each platform actually supports.
+  const { source: videoSource, loading: videoLoading, error: videoError } = useAuthedVideoSource(
+    videoUrl,
+    token,
+  );
   const player = useVideoPlayer(videoSource);
 
   return (
@@ -149,12 +150,20 @@ export default function PatientDetailScreen() {
                       {row.result.annotatedVideo ? (
                         <>
                           <Text style={styles.detailTitle}>Skeleton overlay</Text>
-                          <VideoView
-                            style={styles.video}
-                            player={player}
-                            nativeControls
-                            contentFit="contain"
-                          />
+                          {videoLoading ? (
+                            <View style={styles.videoLoading}>
+                              <ActivityIndicator color="#10b7aa" />
+                            </View>
+                          ) : videoError ? (
+                            <Text style={styles.videoError}>{videoError}</Text>
+                          ) : (
+                            <VideoView
+                              style={styles.video}
+                              player={player}
+                              nativeControls
+                              contentFit="contain"
+                            />
+                          )}
                         </>
                       ) : row.result.annotatedVideoError ? (
                         <Text style={styles.videoError}>
@@ -241,7 +250,15 @@ const styles = StyleSheet.create({
   measurementKey: { flex: 1, fontSize: 12, color: '#334155' },
   measurementValue: { fontSize: 12, fontWeight: '700', color: '#1f2937' },
   video: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10, backgroundColor: '#000000' },
-  videoError: { fontSize: 12, color: '#94a3b8', marginTop: 4 },
+  videoError: { fontSize: 12, color: '#dc5f5f', marginTop: 4 },
+  videoLoading: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 10,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   warning: { backgroundColor: '#fff4e5', borderRadius: 10, padding: 10, marginBottom: 6 },
   warningText: { color: '#8a5a00', fontSize: 12, lineHeight: 17 },
 });
