@@ -367,6 +367,23 @@ Folder names are mapped to test ids with `normalize_test_name`, plus a small
 repair step for dataset-specific spellings (`ROTATORY STABILITY`,
 `Incline Lunge`, `Straight Leg Rise`) that would otherwise fail to match.
 
+### Known limitation: prototype-only default passwords
+
+Every account is created with the password `<mobile number>.physio` (for
+example `9876543210.physio`), set at account creation for both doctor and
+patient accounts, and there is no forced change on first login. **Anyone who
+knows a user's mobile number can sign in as them until that user changes their
+password.** Both profile screens offer a change-password form, and the
+server requires the current password before allowing the change.
+
+This is a deliberate prototype shortcut: it lets a doctor register a patient
+and tell them their password without needing an email or SMS delivery channel.
+It must not survive into anything handling real patient data. The same applies
+to the rest of the auth stack - plain HTTP with no TLS, tokens held in
+unencrypted `AsyncStorage`, an unencrypted SQLite file, and PBKDF2 rather than
+argon2/bcrypt for password hashing. See the module docstring in
+`auth_store.py`.
+
 ### Camera angle: fixed metrics, and two tests that stay provisional
 
 The camera-geometry problem previously documented here is fixed as of commit

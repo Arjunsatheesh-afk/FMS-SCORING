@@ -1,30 +1,49 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ChangePasswordForm from '@/components/change-password-form';
+import { useAuth } from '@/context/auth-context';
+
 export default function ProfileScreen() {
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.heading}>Profile</Text>
 
         <View style={styles.mainCard}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarLabel}>RK</Text>
+            <Text style={styles.avatarLabel}>
+              {(user?.displayName ?? '?').slice(0, 2).toUpperCase()}
+            </Text>
           </View>
-          <Text style={styles.name}>Ramesh Kumar</Text>
-          <Text style={styles.email}>ramesh@email.com</Text>
+          <Text style={styles.name}>{user?.displayName}</Text>
+          <Text style={styles.email}>{user?.email}</Text>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>ACL rehabilitation</Text>
+            <Text style={styles.badgeText}>Patient</Text>
           </View>
         </View>
 
         <View style={styles.detailCard}>
-          <DetailRow label="Physiotherapist" value="Dr. Priya Sharma" />
-          <DetailRow label="Active plans" value="4" />
+          <DetailRow label="Mobile" value={user?.phoneNumber ?? '-'} />
           <DetailRow label="Notifications" value="Enabled" />
           <DetailRow label="Data sharing" value="Doctor only" />
         </View>
-      </View>
+
+        <ChangePasswordForm />
+
+        <Pressable
+          style={styles.signOut}
+          onPress={async () => {
+            await signOut();
+            router.replace('/login');
+          }}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </Pressable>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -46,6 +65,18 @@ const styles = StyleSheet.create({
   container: {
     padding: 18,
     gap: 12,
+    paddingBottom: 86,
+  },
+  signOut: {
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signOutText: {
+    color: '#dc5f5f',
+    fontWeight: '800',
   },
   heading: {
     fontSize: 32,

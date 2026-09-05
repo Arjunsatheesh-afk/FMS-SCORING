@@ -32,5 +32,9 @@ PhysioTracking/node_modules/
 # Local Claude Code config
 .claude/
 
+# Prototype accounts database (contains emails, phone numbers, password hashes)
+physio.db
+*.db
+
 # Third-party paper; linked from the README instead of vendored here
 s41467-020-17807-z.pdf

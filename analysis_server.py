@@ -17,9 +17,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
+import auth_store
 from fms_pipeline import (
     _looks_like_cuda_runtime_failure,
     build_detector,
@@ -163,6 +165,109 @@ def _analyze_video_job(
             video_path.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+auth_store.init_db()
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str
+
+
+class RegisterPatientRequest(BaseModel):
+    email: str
+    displayName: str
+    phoneNumber: str
+    # Optional: omit to use the prototype default of "<phone>.physio".
+    password: str | None = None
+
+
+def _bearer_token(authorization: str | None) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return authorization.split(" ", 1)[1].strip()
+
+
+def current_user(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    user = auth_store.user_for_token(_bearer_token(authorization))
+    if user is None:
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+    return user
+
+
+def current_doctor(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    if user["role"] != "doctor":
+        raise HTTPException(status_code=403, detail="Doctor account required")
+    return user
+
+
+@app.post("/auth/login")
+def login(payload: LoginRequest) -> dict[str, Any]:
+    user = auth_store.verify_credentials(payload.email, payload.password)
+    if user is None:
+        # Deliberately identical for unknown email and wrong password so the
+        # response does not reveal which addresses have accounts.
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    return {"token": auth_store.create_token(user["id"]), "user": user}
+
+
+@app.post("/auth/logout")
+def logout(authorization: str | None = Header(default=None)) -> dict[str, str]:
+    auth_store.delete_token(_bearer_token(authorization))
+    return {"status": "signed_out"}
+
+
+@app.get("/auth/me")
+def me(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    return {"user": user}
+
+
+@app.post("/auth/change-password")
+def change_password(
+    payload: ChangePasswordRequest,
+    authorization: str | None = Header(default=None),
+    user: dict[str, Any] = Depends(current_user),
+) -> dict[str, str]:
+    try:
+        auth_store.change_password(
+            user["id"],
+            payload.currentPassword,
+            payload.newPassword,
+            keep_token=_bearer_token(authorization),
+        )
+    except auth_store.AuthError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "password_changed"}
+
+
+@app.post("/patients")
+def register_patient(
+    payload: RegisterPatientRequest,
+    doctor: dict[str, Any] = Depends(current_doctor),
+) -> dict[str, Any]:
+    try:
+        patient = auth_store.create_user(
+            email=payload.email,
+            role="patient",
+            display_name=payload.displayName,
+            phone_number=payload.phoneNumber,
+            password=payload.password,
+            created_by=doctor["id"],
+        )
+    except auth_store.AuthError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"patient": patient}
+
+
+@app.get("/patients")
+def list_patients(doctor: dict[str, Any] = Depends(current_doctor)) -> dict[str, Any]:
+    return {"patients": auth_store.list_patients_for_doctor(doctor["id"])}
 
 
 @app.get("/health")
