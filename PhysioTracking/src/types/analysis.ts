@@ -42,6 +42,16 @@ export interface VideoMetadata {
   height?: number | null;
 }
 
+/** Skeleton-overlay render produced after scoring. */
+export interface AnnotatedVideo {
+  /** Server-relative path; requires the same bearer token as the API. */
+  url: string;
+  width: number;
+  height: number;
+  fps: number;
+  sizeBytes: number;
+}
+
 export interface AnalysisResult {
   test: FmsTestId;
   testName: string;
@@ -60,6 +70,9 @@ export interface AnalysisResult {
   detectorMode: string;
   detectorDevice: string;
   video: VideoMetadata;
+  /** Absent when the overlay render failed or was not attempted. */
+  annotatedVideo?: AnnotatedVideo;
+  annotatedVideoError?: string;
 }
 
 export interface AnalysisJob {

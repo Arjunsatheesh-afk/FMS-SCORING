@@ -362,6 +362,21 @@ def save_result(
         )
 
 
+def result_for_job(job_id: str) -> dict[str, Any] | None:
+    """One stored result by job id, used to authorise access to its artefacts."""
+    with _lock, _connect() as connection:
+        row = connection.execute(
+            """
+            SELECT results.*, uploader.display_name AS uploaded_by_name
+            FROM results
+            LEFT JOIN users AS uploader ON uploader.id = results.uploaded_by
+            WHERE results.job_id = ?
+            """,
+            (job_id,),
+        ).fetchone()
+    return _row_to_result(row) if row else None
+
+
 def results_for_patient(patient_id: int) -> list[dict[str, Any]]:
     with _lock, _connect() as connection:
         rows = connection.execute(

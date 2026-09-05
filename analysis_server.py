@@ -19,9 +19,11 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import auth_store
+from annotate_video import render_annotated_video
 from fms_pipeline import (
     _looks_like_cuda_runtime_failure,
     build_detector,
@@ -33,6 +35,7 @@ from fms_scoring import FMS_TESTS, normalize_test_name
 SCRIPT_DIR = Path(__file__).parent
 OUTPUT_DIR = Path(os.getenv("PHYSIO_FMS_OUTPUT_DIR", str(SCRIPT_DIR / "fms_outputs" / "api")))
 TRACKED_DIR = OUTPUT_DIR / "tracked"
+ANNOTATED_DIR = OUTPUT_DIR / "annotated"
 POSE_MODE = os.getenv("PHYSIO_POSE_MODE", "balanced")
 PREFERRED_DEVICE = os.getenv("PHYSIO_DEVICE", "cuda")
 DEFAULT_HAND_LENGTH_IN = float(os.getenv("PHYSIO_HAND_LENGTH_IN", "8.0"))
@@ -151,6 +154,24 @@ def _analyze_video_job(
             "detectorDevice": detector_device,
             "video": _tracked_metadata(tracked_json),
         }
+
+        # Skeleton overlay. Deliberately after scoring and non-fatal: a failed
+        # render must not cost the doctor the screening result itself, so the
+        # field is simply absent and the job still completes.
+        try:
+            _set_job(job_id, progress=0.97)
+            render_stats = render_annotated_video(
+                video_path, tracked_json, ANNOTATED_DIR / f"{job_id}.mp4"
+            )
+            summary["annotatedVideo"] = {
+                "url": f"/results/{job_id}/video",
+                "width": render_stats["width"],
+                "height": render_stats["height"],
+                "fps": render_stats["fps"],
+                "sizeBytes": render_stats["sizeBytes"],
+            }
+        except Exception as exc:  # pragma: no cover - render failure path
+            summary["annotatedVideoError"] = f"{type(exc).__name__}: {exc}"
 
         # Persist only completed jobs: a crashed extraction is not a finding.
         try:
@@ -284,6 +305,36 @@ def register_patient(
 @app.get("/patients")
 def list_patients(doctor: dict[str, Any] = Depends(current_doctor)) -> dict[str, Any]:
     return {"patients": auth_store.list_patients_for_doctor(doctor["id"])}
+
+
+@app.get("/results/{job_id}/video")
+def annotated_video(
+    job_id: str,
+    doctor: dict[str, Any] = Depends(current_doctor),
+) -> FileResponse:
+    """Serve the skeleton-overlay video for one screening.
+
+    This is patient footage, so it is gated exactly like the results endpoints:
+    doctor role, and the screening must belong to one of *their* patients. A
+    job id alone must never be enough to fetch a video.
+    """
+    stored = auth_store.result_for_job(job_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Screening not found")
+    if auth_store.patient_of_doctor(doctor["id"], stored["patientId"]) is None:
+        raise HTTPException(status_code=403, detail="Not one of your patients")
+
+    path = ANNOTATED_DIR / f"{job_id}.mp4"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="No annotated video for this screening")
+
+    return FileResponse(
+        path,
+        media_type="video/mp4",
+        filename=f"{job_id}.mp4",
+        # Byte ranges let a player seek without pulling the whole file.
+        headers={"Accept-Ranges": "bytes"},
+    )
 
 
 @app.get("/me/results")

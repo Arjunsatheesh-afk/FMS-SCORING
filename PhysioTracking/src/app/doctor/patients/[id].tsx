@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/context/auth-context';
-import { fetchPatientResults } from '@/lib/api';
+import { API_BASE_URL, fetchPatientResults } from '@/lib/api';
 import {
   faultSummary,
   formatFault,
@@ -52,6 +53,21 @@ export default function PatientDetailScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // One player, pointed at whichever row is open. Hooks cannot be called from
+  // inside the results.map(), and only one video is visible at a time anyway.
+  const openRow = results.find((row) => row.id === expanded) ?? null;
+  const hasVideo = Boolean(openRow?.result?.annotatedVideo);
+  const videoSource =
+    openRow && hasVideo && token
+      ? {
+          uri: `${API_BASE_URL}/results/${openRow.jobId}/video`,
+          // The route is doctor-only and ownership-checked, so the player has
+          // to present the same bearer token the rest of the app uses.
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      : null;
+  const player = useVideoPlayer(videoSource);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -129,6 +145,22 @@ export default function PatientDetailScreen() {
                         {statusLabel(row.result.status)} · pose confidence{' '}
                         {Math.round(row.result.confidence * 100)}%
                       </Text>
+
+                      {row.result.annotatedVideo ? (
+                        <>
+                          <Text style={styles.detailTitle}>Skeleton overlay</Text>
+                          <VideoView
+                            style={styles.video}
+                            player={player}
+                            nativeControls
+                            contentFit="contain"
+                          />
+                        </>
+                      ) : row.result.annotatedVideoError ? (
+                        <Text style={styles.videoError}>
+                          Overlay unavailable for this screening.
+                        </Text>
+                      ) : null}
 
                       <Text style={styles.detailTitle}>Faults</Text>
                       {row.result.faults.length === 0 ? (
@@ -208,6 +240,8 @@ const styles = StyleSheet.create({
   measurement: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 3 },
   measurementKey: { flex: 1, fontSize: 12, color: '#334155' },
   measurementValue: { fontSize: 12, fontWeight: '700', color: '#1f2937' },
+  video: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10, backgroundColor: '#000000' },
+  videoError: { fontSize: 12, color: '#94a3b8', marginTop: 4 },
   warning: { backgroundColor: '#fff4e5', borderRadius: 10, padding: 10, marginBottom: 6 },
   warningText: { color: '#8a5a00', fontSize: 12, lineHeight: 17 },
 });
