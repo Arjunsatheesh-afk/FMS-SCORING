@@ -92,6 +92,8 @@ def _analyze_video_job(
     pain: bool,
     hand_length_in: float,
     shoulder_width_in: float,
+    patient_id: int,
+    uploaded_by: int,
 ) -> None:
     tracked_json = TRACKED_DIR / test_id / f"{job_id}.json"
     try:
@@ -149,6 +151,20 @@ def _analyze_video_job(
             "detectorDevice": detector_device,
             "video": _tracked_metadata(tracked_json),
         }
+
+        # Persist only completed jobs: a crashed extraction is not a finding.
+        try:
+            auth_store.save_result(
+                patient_id=patient_id,
+                uploaded_by=uploaded_by,
+                job_id=job_id,
+                test_id=test_id,
+                result=summary,
+            )
+        except Exception as exc:  # pragma: no cover - storage failure path
+            # The analysis itself succeeded; surface the storage failure without
+            # discarding the result the client is already polling for.
+            _set_job(job_id, storageError=str(exc))
 
         _set_job(job_id, status="completed", progress=1.0, result=summary)
     except Exception as exc:  # pragma: no cover - runtime failure path
@@ -270,6 +286,22 @@ def list_patients(doctor: dict[str, Any] = Depends(current_doctor)) -> dict[str,
     return {"patients": auth_store.list_patients_for_doctor(doctor["id"])}
 
 
+@app.get("/me/results")
+def my_results(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    return {"results": auth_store.results_for_patient(user["id"])}
+
+
+@app.get("/patients/{patient_id}/results")
+def patient_results(
+    patient_id: int,
+    doctor: dict[str, Any] = Depends(current_doctor),
+) -> dict[str, Any]:
+    patient = auth_store.patient_of_doctor(doctor["id"], patient_id)
+    if patient is None:
+        raise HTTPException(status_code=403, detail="Not one of your patients")
+    return {"patient": patient, "results": auth_store.results_for_patient(patient_id)}
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -295,8 +327,27 @@ async def create_analysis_job(
     pain: bool = Form(False),
     hand_length_in: float = Form(DEFAULT_HAND_LENGTH_IN),
     shoulder_width_in: float = Form(DEFAULT_SHOULDER_WIDTH_IN),
+    patient_id: int | None = Form(default=None),
     file: UploadFile = File(...),
+    user: dict[str, Any] = Depends(current_user),
 ) -> dict[str, Any]:
+    # Uploads are doctor-only in this prototype. Patients cannot submit a
+    # screening at all - not for themselves, not with patient_id omitted. The
+    # role check comes first so a patient is rejected identically whatever they
+    # send, rather than falling through to the ownership checks below.
+    if user["role"] != "doctor":
+        raise HTTPException(
+            status_code=403, detail="Only a doctor can record a screening"
+        )
+
+    # A doctor must name one of their own patients. Without the ownership check
+    # any doctor could write results into any patient's record by guessing an id.
+    if patient_id is None:
+        raise HTTPException(status_code=400, detail="patient_id is required when a doctor uploads")
+    target_patient = auth_store.patient_of_doctor(user["id"], patient_id)
+    if target_patient is None:
+        raise HTTPException(status_code=403, detail="Not one of your patients")
+
     test_id = normalize_test_name(exercise)
     if test_id is None:
         raise HTTPException(
@@ -325,6 +376,9 @@ async def create_analysis_job(
             "progress": 0.0,
             "createdAt": created,
             "updatedAt": created,
+            "patientId": target_patient["id"],
+            "patientName": target_patient["displayName"],
+            "uploadedBy": user["id"],
             "result": None,
             "error": None,
         }
@@ -337,6 +391,8 @@ async def create_analysis_job(
             "pain": pain,
             "hand_length_in": hand_length_in,
             "shoulder_width_in": shoulder_width_in,
+            "patient_id": target_patient["id"],
+            "uploaded_by": user["id"],
         },
         daemon=True,
     )

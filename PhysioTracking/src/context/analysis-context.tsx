@@ -1,87 +1,85 @@
-import { File, Paths } from 'expo-file-system';
-import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { SessionSummary } from '@/types/analysis';
-
-const ANALYSIS_HISTORY_STORAGE_KEY = 'physiotracking.analysis.history';
-
-/**
- * Built on demand rather than at module scope: constructing it at import time
- * runs a native expo-file-system call during web server rendering, where the
- * module is unsupported, and that crashes the whole render before any screen
- * mounts. Callers already treat failures as "no stored history".
- */
-function historyFile() {
-  return new File(Paths.document, `${ANALYSIS_HISTORY_STORAGE_KEY}.json`);
-}
+import { useAuth } from '@/context/auth-context';
+import { fetchMyResults } from '@/lib/api';
+import { SessionSummary, StoredResult } from '@/types/analysis';
 
 interface AnalysisContextValue {
   latestSession: SessionSummary | null;
   history: SessionSummary[];
   addSession: (session: SessionSummary) => void;
+  refresh: () => Promise<void>;
   isHydrated: boolean;
+  error: string | null;
 }
 
 const AnalysisContext = createContext<AnalysisContextValue | undefined>(undefined);
 
+/** Server row -> the shape every screen already renders. */
+function toSession(row: StoredResult): SessionSummary {
+  return {
+    ...row.result,
+    id: row.jobId,
+    createdAt: row.createdAt,
+    uploadedBy: row.uploadedBy,
+    uploadedByName: row.uploadedByName,
+  };
+}
+
+/**
+ * Screening history now comes from the server (GET /me/results) rather than a
+ * file on the device, so a doctor and a patient see the same record. Home,
+ * feedback and progress all read this one context, which is what keeps them
+ * consistent with each other.
+ */
 export function AnalysisProvider({ children }: PropsWithChildren) {
+  const { status, token, user } = useAuth();
   const [history, setHistory] = useState<SessionSummary[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadHistory() {
-      try {
-        const file = historyFile();
-        if (file.exists) {
-          const storedHistory = await file.text();
-          if (storedHistory && isMounted) {
-            setHistory(JSON.parse(storedHistory) as SessionSummary[]);
-          }
-        }
-      } catch {
-        if (isMounted) {
-          setHistory([]);
-        }
-      } finally {
-        if (isMounted) {
-          setIsHydrated(true);
-        }
-      }
-    }
-
-    void loadHistory();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isHydrated) {
+  const refresh = useCallback(async () => {
+    if (!token || user?.role !== 'patient') {
+      // Doctors read a specific patient's results instead; there is no
+      // meaningful "my own history" for a doctor account.
+      setHistory([]);
+      setIsHydrated(true);
       return;
     }
-
-    // Persistence is best-effort: unsupported on web, and a write failure must
-    // not take down the screen that triggered it.
     try {
-      void historyFile().write(JSON.stringify(history));
-    } catch {
-      /* ignore */
+      const rows = await fetchMyResults(token);
+      setHistory(rows.map(toSession));
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsHydrated(true);
     }
-  }, [history, isHydrated]);
+  }, [token, user?.role]);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (status === 'signedOut') {
+      // Never leave one account's history on screen for the next sign-in.
+      setHistory([]);
+      setIsHydrated(true);
+      return;
+    }
+    void refresh();
+  }, [status, refresh]);
 
   const value = useMemo<AnalysisContextValue>(
     () => ({
       latestSession: history[0] ?? null,
       history,
-      addSession: (session) => {
-        setHistory((prev) => [session, ...prev]);
-      },
+      // Shows the just-finished screening immediately; the next refresh
+      // replaces it with the stored row.
+      addSession: (session) => setHistory((prev) => [session, ...prev]),
+      refresh,
       isHydrated,
+      error,
     }),
-    [history, isHydrated],
+    [history, refresh, isHydrated, error],
   );
 
   return <AnalysisContext.Provider value={value}>{children}</AnalysisContext.Provider>;

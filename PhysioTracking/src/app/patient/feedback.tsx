@@ -2,6 +2,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAnalysis } from '@/context/analysis-context';
+import { useAuth } from '@/context/auth-context';
 import {
   formatFault,
   formatMeasurementKey,
@@ -9,17 +10,22 @@ import {
   formatScore,
   scoreColor,
   statusLabel,
+  uploaderLabel,
 } from '@/lib/fms';
 
 export default function FeedbackScreen() {
   const { latestSession } = useAnalysis();
+  const { user } = useAuth();
 
   if (!latestSession) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No feedback yet</Text>
-          <Text style={styles.emptyBody}>Record an exercise clip to receive frame-by-frame AI analysis.</Text>
+          <Text style={styles.emptyBody}>
+            Your physiotherapist will record a movement screen for you. Feedback appears here
+            afterwards.
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -42,6 +48,9 @@ export default function FeedbackScreen() {
           {statusLabel(latestSession.status)} · pose confidence{' '}
           {Math.round(latestSession.confidence * 100)}%
         </Text>
+        {uploaderLabel(latestSession, user?.id) ? (
+          <Text style={styles.uploader}>{uploaderLabel(latestSession, user?.id)}</Text>
+        ) : null}
 
         <View style={styles.scoreCard}>
           <View style={styles.scoreCircle}>
@@ -117,6 +126,11 @@ const styles = StyleSheet.create({
   subheading: {
     color: '#64748b',
     fontSize: 13,
+  },
+  uploader: {
+    color: '#0f9f95',
+    fontSize: 12,
+    fontWeight: '700',
   },
   scoreCard: {
     backgroundColor: '#ffffff',

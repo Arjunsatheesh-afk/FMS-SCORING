@@ -77,6 +77,31 @@ export function statusLabel(status: SessionSummary['status']) {
   return 'Scored';
 }
 
+/**
+ * Who recorded a screening, from the viewer's perspective. Patients see this
+ * on their own history: a screening their physio recorded for them should not
+ * look identical to one they recorded themselves.
+ *
+ * NOTE: the 'Self-recorded' branch is currently unreachable. Patients cannot
+ * upload in this prototype - the server rejects patient-role uploads with 403
+ * and the patient app has no recorder - so every stored screening is recorded
+ * by a doctor. The branch is kept deliberately: patient self-upload may be
+ * re-enabled as a feature after the prototype submission, and this is the only
+ * place the distinction needs to be expressed.
+ */
+export function uploaderLabel(
+  session: Pick<SessionSummary, 'uploadedBy' | 'uploadedByName'>,
+  viewerId: number | undefined,
+) {
+  if (session.uploadedBy === undefined) {
+    return null;
+  }
+  if (viewerId !== undefined && session.uploadedBy === viewerId) {
+    return 'Self-recorded';
+  }
+  return session.uploadedByName ? `Recorded by ${session.uploadedByName}` : 'Recorded by your physio';
+}
+
 export function faultSummary(faults: string[]) {
   if (faults.length === 0) {
     return 'No faults detected';

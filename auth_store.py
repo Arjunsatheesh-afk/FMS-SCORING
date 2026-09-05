@@ -78,8 +78,27 @@ def init_db() -> None:
                 expires_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS results (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id        INTEGER NOT NULL REFERENCES users(id),
+                uploaded_by       INTEGER NOT NULL REFERENCES users(id),
+                job_id            TEXT NOT NULL UNIQUE,
+                test_id           TEXT NOT NULL,
+                -- Nullable on purpose: the scorer returns null for
+                -- insufficient_data and manual_required. Storing 0 there would
+                -- read as "pain reported", which is a different finding.
+                score             INTEGER,
+                faults_json       TEXT NOT NULL,
+                measurements_json TEXT NOT NULL,
+                -- Full FMSScorer output, so the detail view keeps confidence,
+                -- status and video metadata without extra columns per field.
+                result_json       TEXT NOT NULL,
+                created_at        TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_created_by ON users(created_by);
             CREATE INDEX IF NOT EXISTS idx_tokens_user ON auth_tokens(user_id);
+            CREATE INDEX IF NOT EXISTS idx_results_patient ON results(patient_id, created_at);
             """
         )
 
@@ -277,3 +296,82 @@ def get_user(user_id: int) -> dict[str, Any] | None:
     with _lock, _connect() as connection:
         row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     return _row_to_user(row) if row else None
+
+
+def patient_of_doctor(doctor_id: int, patient_id: int) -> dict[str, Any] | None:
+    """The patient, only if this doctor registered them.
+
+    Every doctor-side read and write goes through this: without it any signed-in
+    doctor could reach any patient by guessing an id.
+    """
+    with _lock, _connect() as connection:
+        row = connection.execute(
+            "SELECT * FROM users WHERE id = ? AND role = 'patient' AND created_by = ?",
+            (patient_id, doctor_id),
+        ).fetchone()
+    return _row_to_user(row) if row else None
+
+
+def _row_to_result(row: sqlite3.Row) -> dict[str, Any]:
+    import json
+
+    stored = json.loads(row["result_json"])
+    return {
+        "id": row["id"],
+        "patientId": row["patient_id"],
+        "uploadedBy": row["uploaded_by"],
+        "uploadedByName": row["uploaded_by_name"] if "uploaded_by_name" in row.keys() else None,
+        "jobId": row["job_id"],
+        "createdAt": row["created_at"],
+        # The full scorer output, so clients render the same shape they get
+        # from a freshly polled job.
+        "result": stored,
+    }
+
+
+def save_result(
+    *,
+    patient_id: int,
+    uploaded_by: int,
+    job_id: str,
+    test_id: str,
+    result: dict[str, Any],
+) -> None:
+    import json
+
+    score = result.get("score")
+    with _lock, _connect() as connection:
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO results
+                (patient_id, uploaded_by, job_id, test_id, score,
+                 faults_json, measurements_json, result_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                patient_id,
+                uploaded_by,
+                job_id,
+                test_id,
+                score if isinstance(score, int) else None,
+                json.dumps(result.get("faults", [])),
+                json.dumps(result.get("measurements", {})),
+                json.dumps(result),
+                _utc_now().isoformat(),
+            ),
+        )
+
+
+def results_for_patient(patient_id: int) -> list[dict[str, Any]]:
+    with _lock, _connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT results.*, uploader.display_name AS uploaded_by_name
+            FROM results
+            LEFT JOIN users AS uploader ON uploader.id = results.uploaded_by
+            WHERE results.patient_id = ?
+            ORDER BY results.created_at DESC
+            """,
+            (patient_id,),
+        ).fetchall()
+    return [_row_to_result(row) for row in rows]

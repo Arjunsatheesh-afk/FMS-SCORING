@@ -6,15 +6,29 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAnalysis } from '@/context/analysis-context';
+import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, createAnalysisJob, fetchAnalysisJob, fetchExercises } from '@/lib/api';
 import { formatScore } from '@/lib/fms';
 import { AnalysisJob, FmsExercise, FmsTestId, SessionSummary } from '@/types/analysis';
 
 const POLL_MS = 1500;
 
-export default function RecordScreen() {
+interface ScreeningRecorderProps {
+  /** Set when a doctor records for a patient; omitted for a patient's own screening. */
+  patientId?: number;
+  patientName?: string;
+  /** Where to go once a screening finishes. */
+  completeHref: string;
+}
+
+export default function ScreeningRecorder({
+  patientId,
+  patientName,
+  completeHref,
+}: ScreeningRecorderProps) {
   const router = useRouter();
-  const { addSession } = useAnalysis();
+  const { addSession, refresh } = useAnalysis();
+  const { token } = useAuth();
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [mediaPermission, requestMediaPermission] = ImagePicker.useMediaLibraryPermissions();
@@ -63,9 +77,15 @@ export default function RecordScreen() {
     setJob(null);
 
     try {
+      if (!token) {
+        setErrorMessage('Your session has expired. Sign in again.');
+        return;
+      }
       const created = await createAnalysisJob({
         uri: videoUri,
         exercise: selectedExercise,
+        token,
+        patientId,
       });
       setJob(created);
       startPolling(created.id);
@@ -105,7 +125,8 @@ export default function RecordScreen() {
             ...nextJob.result,
           };
           addSession(summary);
-          router.push('/feedback');
+          void refresh();
+          router.push(completeHref as never);
         }
 
         if (nextJob.status === 'failed') {
@@ -193,6 +214,9 @@ export default function RecordScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Record exercise</Text>
         <Text style={styles.subtitle}>
+          {patientName
+            ? `Recording for ${patientName}. `
+            : ''}
           Capture in app or upload a clip. Server URL: {API_BASE_URL}
         </Text>
 

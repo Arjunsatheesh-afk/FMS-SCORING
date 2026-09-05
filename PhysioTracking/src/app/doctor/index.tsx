@@ -1,6 +1,6 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/context/auth-context';
@@ -8,6 +8,7 @@ import { fetchPatients } from '@/lib/api';
 import { AuthUser } from '@/types/auth';
 
 export default function DoctorHomeScreen() {
+  const router = useRouter();
   const { user, token } = useAuth();
   const [patients, setPatients] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +58,15 @@ export default function DoctorHomeScreen() {
         ) : (
           <View style={styles.card}>
             {patients.map((patient) => (
-              <View key={patient.id} style={styles.row}>
+              <Pressable
+                key={patient.id}
+                style={styles.row}
+                onPress={() =>
+                  router.push({
+                    pathname: '/doctor/patients/[id]',
+                    params: { id: String(patient.id) },
+                  })
+                }>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initials(patient.displayName)}</Text>
                 </View>
@@ -68,15 +77,13 @@ export default function DoctorHomeScreen() {
                   </Text>
                   <Text style={styles.meta}>{patient.phoneNumber}</Text>
                 </View>
-              </View>
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
             ))}
           </View>
         )}
 
-        <Text style={styles.note}>
-          Recorded screen results are not shared with the doctor account yet - results currently
-          stay on the patient&apos;s device.
-        </Text>
+        <Text style={styles.note}>Tap a patient to see their screening history.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -120,5 +127,6 @@ const styles = StyleSheet.create({
   meta: { fontSize: 12, color: '#64748b' },
   muted: { color: '#64748b', fontSize: 14 },
   error: { color: '#dc5f5f', fontSize: 13 },
+  chevron: { color: '#94a3b8', fontSize: 22, fontWeight: '700' },
   note: { color: '#94a3b8', fontSize: 12, lineHeight: 17, marginTop: 4 },
 });

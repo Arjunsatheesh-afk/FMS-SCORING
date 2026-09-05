@@ -77,4 +77,19 @@ export interface AnalysisJob {
 export interface SessionSummary extends AnalysisResult {
   id: string;
   createdAt: string;
+  /** Who submitted this screening - the patient themselves, or their doctor. */
+  uploadedBy?: number;
+  uploadedByName?: string | null;
+}
+
+/** A row from GET /me/results or GET /patients/{id}/results. */
+export interface StoredResult {
+  id: number;
+  patientId: number;
+  uploadedBy: number;
+  uploadedByName: string | null;
+  jobId: string;
+  createdAt: string;
+  /** Full FMSScorer output, same shape a freshly polled job returns. */
+  result: AnalysisResult;
 }

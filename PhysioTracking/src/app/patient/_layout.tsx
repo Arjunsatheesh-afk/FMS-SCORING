@@ -7,6 +7,11 @@ import { useAuth } from '@/context/auth-context';
 /**
  * Patient area guard. expo-router v56 has no Stack.Protected guard prop, so
  * the check lives in the layout and redirects with <Redirect>.
+ *
+ * Patients are view-only in this prototype: screenings are recorded by their
+ * doctor, so there is no Record tab and no recorder route on this side. The
+ * server rejects patient-role uploads outright, so this is a UI reflection of
+ * that rule rather than the enforcement of it.
  */
 export default function PatientLayout() {
   const scheme = useColorScheme();
@@ -36,7 +41,6 @@ export default function PatientLayout() {
         headerShown: false,
       }}>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="record" options={{ title: 'Record' }} />
       <Tabs.Screen name="feedback" options={{ title: 'Feedback' }} />
       <Tabs.Screen name="progress" options={{ title: 'Progress' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />

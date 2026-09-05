@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { File, UploadType } from 'expo-file-system';
 
-import { AnalysisJob, FmsExercise, FmsTestId } from '@/types/analysis';
+import { AnalysisJob, FmsExercise, FmsTestId, StoredResult } from '@/types/analysis';
 import { AuthUser, RegisterPatientInput, SignInResult } from '@/types/auth';
 
 const DEFAULT_API_BASE_URL =
@@ -101,12 +101,34 @@ export async function fetchExercises() {
   return parseJson<{ exercises: FmsExercise[] }>(response);
 }
 
+export async function fetchMyResults(token: string) {
+  const response = await fetch(`${API_BASE_URL}/me/results`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await parseJson<{ results: StoredResult[] }>(response);
+  return body.results;
+}
+
+export async function fetchPatientResults(token: string, patientId: number) {
+  const response = await fetch(`${API_BASE_URL}/patients/${patientId}/results`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return parseJson<{ patient: AuthUser; results: StoredResult[] }>(response);
+}
+
 export async function createAnalysisJob(params: {
   uri: string;
   name?: string;
   mimeType?: string;
   /** FMS test id, e.g. 'deep_squat'. */
   exercise: FmsTestId;
+  /** Required: uploads are attributed to a patient server-side. */
+  token: string;
+  /**
+   * Required when a doctor uploads, rejected when a patient names anyone but
+   * themselves. Omit for a patient recording their own screening.
+   */
+  patientId?: number;
   /** Self-reported pain during the movement forces a score of 0. */
   pain?: boolean;
   /** Calibration used by shoulder_mobility scoring; server defaults apply when omitted. */
@@ -115,6 +137,9 @@ export async function createAnalysisJob(params: {
 }) {
   const file = new File(params.uri);
   const parameters: Record<string, string> = { exercise: params.exercise };
+  if (params.patientId !== undefined) {
+    parameters.patient_id = String(params.patientId);
+  }
   if (params.pain !== undefined) {
     parameters.pain = String(params.pain);
   }
@@ -130,6 +155,7 @@ export async function createAnalysisJob(params: {
     uploadType: UploadType.MULTIPART,
     fieldName: 'file',
     mimeType: params.mimeType ?? file.type ?? 'video/mp4',
+    headers: { Authorization: `Bearer ${params.token}` },
     parameters,
   });
 

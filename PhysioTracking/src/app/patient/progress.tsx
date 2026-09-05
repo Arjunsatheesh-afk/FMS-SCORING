@@ -2,10 +2,19 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAnalysis } from '@/context/analysis-context';
-import { averageScore, faultSummary, formatScore, scoreColor, scoredSessions } from '@/lib/fms';
+import { useAuth } from '@/context/auth-context';
+import {
+  averageScore,
+  faultSummary,
+  formatScore,
+  scoreColor,
+  scoredSessions,
+  uploaderLabel,
+} from '@/lib/fms';
 
 export default function ProgressScreen() {
   const { history } = useAnalysis();
+  const { user } = useAuth();
 
   const scored = scoredSessions(history);
   const bestScore = scored.length > 0 ? Math.max(...scored.map((item) => item.score)) : null;
@@ -59,7 +68,9 @@ export default function ProgressScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Session details</Text>
           {history.length === 0 ? (
-            <Text style={styles.emptyText}>Record from the Record tab to see your analytics history.</Text>
+            <Text style={styles.emptyText}>
+              Screenings recorded by your physiotherapist will appear here.
+            </Text>
           ) : (
             history.map((session) => (
               <View key={session.id} style={styles.detailRow}>
@@ -68,6 +79,9 @@ export default function ProgressScreen() {
                   <Text style={styles.detailMeta} numberOfLines={1}>
                     {faultSummary(session.faults)}
                   </Text>
+                  {uploaderLabel(session, user?.id) ? (
+                    <Text style={styles.detailUploader}>{uploaderLabel(session, user?.id)}</Text>
+                  ) : null}
                 </View>
                 <Text style={[styles.detailScore, { color: scoreColor(session.score) }]}>
                   {formatScore(session.score, session.maxScore)}
@@ -193,6 +207,11 @@ const styles = StyleSheet.create({
   detailMeta: {
     fontSize: 12,
     color: '#64748b',
+  },
+  detailUploader: {
+    fontSize: 11,
+    color: '#0f9f95',
+    fontWeight: '700',
   },
   detailScore: {
     fontWeight: '700',

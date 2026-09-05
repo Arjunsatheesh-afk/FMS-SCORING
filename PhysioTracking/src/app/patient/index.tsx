@@ -21,10 +21,10 @@ export default function HomeScreen() {
           <Text style={styles.heroBody}>
             {latestSession
               ? `Last score ${formatScore(latestSession.score, latestSession.maxScore)}. Keep moving toward consistent form.`
-              : 'Record your first guided session and get AI pose feedback in under a minute.'}
+              : 'Your physiotherapist records your movement screens. Results appear here once reviewed.'}
           </Text>
-          <Pressable style={styles.primaryAction} onPress={() => router.push('/record')}>
-            <Text style={styles.primaryActionText}>Start session</Text>
+          <Pressable style={styles.primaryAction} onPress={() => router.push('/patient/progress')}>
+            <Text style={styles.primaryActionText}>View my progress</Text>
           </Pressable>
         </View>
 
@@ -45,13 +45,15 @@ export default function HomeScreen() {
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Recent sessions</Text>
-            <Pressable onPress={() => router.push('/progress')}>
+            <Pressable onPress={() => router.push('/patient/progress')}>
               <Text style={styles.link}>See all</Text>
             </Pressable>
           </View>
 
           {history.length === 0 ? (
-            <Text style={styles.mutedText}>No sessions yet. Record one to populate this feed.</Text>
+            <Text style={styles.mutedText}>
+              No screenings yet. Your physiotherapist will record one for you.
+            </Text>
           ) : (
             history.slice(0, 4).map((item) => (
               <View key={item.id} style={styles.sessionRow}>
