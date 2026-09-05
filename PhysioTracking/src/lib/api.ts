@@ -135,7 +135,6 @@ export async function createAnalysisJob(params: {
   handLengthIn?: number;
   shoulderWidthIn?: number;
 }) {
-  const file = new File(params.uri);
   const parameters: Record<string, string> = { exercise: params.exercise };
   if (params.patientId !== undefined) {
     parameters.patient_id = String(params.patientId);
@@ -150,6 +149,30 @@ export async function createAnalysisJob(params: {
     parameters.shoulder_width_in = String(params.shoulderWidthIn);
   }
 
+  if (Platform.OS === 'web') {
+    // expo-file-system has no web implementation: constructing its File throws
+    // "this.validatePath is not a function", which is what broke gallery
+    // upload on web. The browser can post the file itself, so on web the blob
+    // is fetched from the picked URI (blob:/data:) and sent as FormData.
+    const blob = await (await fetch(params.uri)).blob();
+    const form = new FormData();
+    for (const [key, value] of Object.entries(parameters)) {
+      form.append(key, value);
+    }
+    // Third argument is the filename; the server reads it for the extension.
+    form.append('file', blob, params.name ?? 'upload.mp4');
+
+    const response = await fetch(`${API_BASE_URL}/analysis/jobs`, {
+      method: 'POST',
+      // Content-Type is deliberately omitted: the browser must set it so the
+      // multipart boundary matches the body it generates.
+      headers: { Authorization: `Bearer ${params.token}` },
+      body: form,
+    });
+    return parseJson<AnalysisJob>(response);
+  }
+
+  const file = new File(params.uri);
   const uploadTask = file.createUploadTask(`${API_BASE_URL}/analysis/jobs`, {
     httpMethod: 'POST',
     uploadType: UploadType.MULTIPART,

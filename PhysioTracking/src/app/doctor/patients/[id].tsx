@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -51,9 +51,13 @@ export default function PatientDetailScreen() {
     }
   }, [token, id]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Refetch on focus, not just on mount: returning here after recording a
+  // screening would otherwise show the stale list without the new result.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   // One player, pointed at whichever row is open. Hooks cannot be called from
   // inside the results.map(), and only one video is visible at a time anyway.
