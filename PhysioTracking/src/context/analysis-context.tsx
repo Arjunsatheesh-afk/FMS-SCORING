@@ -4,7 +4,16 @@ import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useSt
 import { SessionSummary } from '@/types/analysis';
 
 const ANALYSIS_HISTORY_STORAGE_KEY = 'physiotracking.analysis.history';
-const analysisHistoryFile = new File(Paths.document, `${ANALYSIS_HISTORY_STORAGE_KEY}.json`);
+
+/**
+ * Built on demand rather than at module scope: constructing it at import time
+ * runs a native expo-file-system call during web server rendering, where the
+ * module is unsupported, and that crashes the whole render before any screen
+ * mounts. Callers already treat failures as "no stored history".
+ */
+function historyFile() {
+  return new File(Paths.document, `${ANALYSIS_HISTORY_STORAGE_KEY}.json`);
+}
 
 interface AnalysisContextValue {
   latestSession: SessionSummary | null;
@@ -24,8 +33,9 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
 
     async function loadHistory() {
       try {
-        if (analysisHistoryFile.exists) {
-          const storedHistory = await analysisHistoryFile.text();
+        const file = historyFile();
+        if (file.exists) {
+          const storedHistory = await file.text();
           if (storedHistory && isMounted) {
             setHistory(JSON.parse(storedHistory) as SessionSummary[]);
           }
@@ -53,7 +63,13 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    void analysisHistoryFile.write(JSON.stringify(history));
+    // Persistence is best-effort: unsupported on web, and a write failure must
+    // not take down the screen that triggered it.
+    try {
+      void historyFile().write(JSON.stringify(history));
+    } catch {
+      /* ignore */
+    }
   }, [history, isHydrated]);
 
   const value = useMemo<AnalysisContextValue>(
