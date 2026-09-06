@@ -24,7 +24,9 @@ export const FMS_TEST_NAMES: Record<FmsTestId, string> = {
   shoulder_mobility: 'Shoulder Mobility',
   active_straight_leg_raise: 'Active Straight-Leg Raise',
   trunk_stability_pushup: 'Trunk Stability Push-Up',
-  rotary_stability: 'Rotary Stability',
+  // "Rotatory" is the department's official spelling. The test id stays
+  // `rotary_stability`; only what a clinician reads changes.
+  rotary_stability: 'Rotatory Stability',
 };
 
 /**
@@ -394,7 +396,7 @@ export const FAULT_LABELS: Record<string, string> = {
   insufficient_pushup_range: 'Not enough push-up range',
   trunk_extension_or_sag: 'Trunk sags or extends',
   knee_flexion: 'Knees bend',
-  // Rotary stability
+  // Rotatory stability
   fail_to_touch_elbow_to_knee: 'Elbow did not reach knee',
   shoulder_or_pelvis_rotation: 'Shoulder or pelvis rotates',
   shoulder_lowering: 'Shoulder drops',

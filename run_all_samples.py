@@ -35,9 +35,13 @@ VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv"}
 SAMPLE_PATTERN = re.compile(r"^sample[\s_-]*(\d+)$", re.IGNORECASE)
 
 # This dataset spells several tests differently from the aliases in FMS_TESTS
-# ("ROTATORY STABILITY", "Incline Lunge", "Straight Leg Rise"). These repairs
-# are applied ONLY after normalize_test_name() has already failed on the raw
-# folder name, so canonical names keep taking the normal path.
+# ("Incline Lunge", "Straight Leg Rise"). These repairs are applied ONLY after
+# normalize_test_name() has already failed on the raw folder name, so canonical
+# names keep taking the normal path.
+#
+# The "rotatory" entry is now redundant - it is the department's official
+# spelling and a canonical alias, so normalize_test_name() resolves it first.
+# Kept because it costs nothing and still catches partial spellings.
 NAME_REPAIRS = (
     ("rotatory", "rotary"),
     ("incline lunge", "inline lunge"),

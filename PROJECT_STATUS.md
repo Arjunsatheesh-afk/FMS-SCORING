@@ -1,8 +1,8 @@
 # Project Status
 
-**Last updated:** 5 September 2026
+**Last updated:** 6 September 2026
 **Repo:** https://github.com/Arjunsatheesh-afk/FMS-SCORING.git
-**Branch:** `master` — clean working tree, in sync with `origin/master`, HEAD `636a206`
+**Branch:** `master` — in sync with `origin/master`, HEAD `b1492ac`
 
 This file is written for someone with **no prior context**. It covers what the system
 does, every significant decision and why it was made, what has been validated and how,
@@ -91,7 +91,8 @@ auth_store.py             SQLite: users, tokens, results. All SQL is here.
 annotate_video.py         Skeleton-overlay renderer (reads cached keypoints, no detector).
 run_all_samples.py        Batch runner over the Dataset/ folder tree.
 seed_accounts.py          Creates the doctor + demo patients.
-test_fms_scoring.py       3 tests. Coverage is thin — see section 13.
+test_fms_scoring.py       11 tests, five of which guard the threshold table
+                          against the scoring code. See section 13.
 
 analysis/                 Five throwaway-but-kept analysis scripts from the camera-angle
                           investigation (candidate_metrics.py, candidate_metrics2.py,
@@ -118,10 +119,12 @@ password hashes.
 
 ## 4. Git history
 
-Ten commits, all pushed:
+Twelve commits, all pushed:
 
 | SHA | Commit |
 |---|---|
+| `b1492ac` | Add doctor FMS report, threshold sourcing, and overlay cleanup |
+| `c2c0afb` | Add PROJECT_STATUS.md |
 | `636a206` | Fix gallery upload on web, and stale screening list after recording |
 | `0336a81` | Play auth-gated overlay videos on web via blob fetch |
 | `55d1f91` | Add skeleton-overlay video for screenings |
@@ -164,10 +167,15 @@ does not use the `complete`/faults machinery.
 
 ### Where thresholds live
 
-**Every threshold is a literal constant inside a `_score_<test>` method in
-`fms_scoring.py`.** There is no config file. This was intentional — the numbers are
-under review and keeping them inline with the reasoning comments made the review
-tractable. If the department signs off on a different set, they are one-line edits.
+**Every threshold is a `Check` object in `THRESHOLDS` in `fms_scoring.py`**, and the
+`_score_*` methods evaluate those same objects through `_fires()` and `_incomplete()`.
+There is exactly one copy of each number, and `GET /fms/thresholds` serves it to the app,
+so a report cannot show a threshold that differs from the one a screening was scored
+against. Five tests guard that guarantee — see section 12. If the department signs off on
+a different set, they are one-line edits to the table.
+
+*(They were bare literals inside the scoring methods until 6 Sep 2026; the refactor was
+verified score-neutral against all 126 cached videos.)*
 
 A complete plain-language table of every threshold, what it measures, its camera-view
 assumption and its clinical meaning is published here:
@@ -214,7 +222,7 @@ measured. Torso was chosen after measuring, not assumed.
   tracking outward is the normal baseline in this cohort, not a compensation. Any varus
   cut would have sliced the tail of that distribution at an arbitrary point.
 - Hurdle step pelvis tilt `> 0.18`, knee rotation `> 0.30`.
-- Rotary stability fail-to-touch `0.25 → 0.40`, complete gate `<= 0.60`. The 0.40 sits in
+- Rotatory stability fail-to-touch `0.25 → 0.40`, complete gate `<= 0.60`. The 0.40 sits in
   an empty band: 16 of 18 attempts land at or below 0.284 and the two genuine misses at
   0.817. A tighter cut would have clipped the top of the successful cluster.
 
@@ -237,7 +245,7 @@ viewing azimuth directly, and the seven tests split cleanly with nothing in betw
 | Inline Lunge | 0.21 | 0.14 | Sagittal |
 | Active Straight-Leg Raise | 0.11 | 0.19 | Sagittal |
 | Trunk Stability Push-Up | 0.19 | 0.21 | Sagittal |
-| Rotary Stability | 0.14 | 0.20 | Sagittal |
+| Rotatory Stability | 0.14 | 0.20 | Sagittal |
 
 Dropped checks, recorded in each result's `measurements.notAssessed` and surfaced in the
 app under *"Not assessed from this view"*:
@@ -246,10 +254,10 @@ app under *"Not assessed from this view"*:
 |---|---|---|
 | Inline Lunge | `knee_alignment_compensation`, `balance_or_pelvis_shift` | Both frontal-plane quantities; test is filmed sagittally. |
 | Active Straight-Leg Raise | `pelvis_lift_or_rotation` | Subject is supine and filmed from the side, so the pelvis L–R axis points at the camera. Obliquity cannot be separated from rotation. |
-| Rotary Stability | `shoulder_or_pelvis_rotation`, `shoulder_lowering` | Both derive from transverse-segment tilt, unrecoverable from the sagittal view. The elbow-to-knee touch is kept because that movement happens in the plane the camera sees. |
+| Rotatory Stability | `shoulder_or_pelvis_rotation`, `shoulder_lowering` | Both derive from transverse-segment tilt, unrecoverable from the sagittal view. The elbow-to-knee touch is kept because that movement happens in the plane the camera sees. |
 
 **Consequence, and it matters:** a dropped check can only push a score *up*, never down.
-Inline Lunge and Rotary Stability therefore read high. The app marks both as
+Inline Lunge and Rotatory Stability therefore read high. The app marks both as
 **provisional** with an amber banner (`PROVISIONAL_TESTS` in
 `PhysioTracking/src/app/doctor/patients/[id].tsx`).
 
@@ -284,7 +292,7 @@ Score distribution:
 | Shoulder Mobility | 1.56 | 13 | 0 | 5 |
 | Active Straight-Leg Raise | 2.44 | 0 | 10 | 8 |
 | Trunk Stability Push-Up | 3.00 | 0 | 0 | 18 |
-| Rotary Stability | 2.78 | 2 | 0 | 16 |
+| Rotatory Stability | 2.78 | 2 | 0 | 16 |
 
 ### Findings from this distribution that need attention
 
@@ -632,7 +640,7 @@ once the department signs the numbers off — that is when the distinction start
 
 4. **Left/right side pairing — UNDECIDED, and it affects the recording protocol, not just
    the code.** The clinical protocol scores Hurdle Step, Inline Lunge, Straight-Leg Raise
-   and Rotary Stability on **each side** and records the lower. The system currently
+   and Rotatory Stability on **each side** and records the lower. The system currently
    produces **one score per video from one frame**. Only Shoulder Mobility scores both
    sides (by top hand) and takes the worse. Implementing this needs either two videos per
    test or reliable side detection within one — so the department has to agree the
