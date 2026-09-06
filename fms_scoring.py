@@ -92,6 +92,188 @@ FMS_TESTS = {
 }
 
 
+@dataclass(frozen=True)
+class Check:
+    """One threshold the scorer applies to one measurement.
+
+    Declared once and used twice: the `_score_*` methods evaluate these objects
+    to decide faults, and `threshold_spec()` serves the same objects to the app
+    so a report can show a measurement next to the number it was judged
+    against. There is deliberately no second copy of these values anywhere -
+    a parallel table would drift the first time a threshold is tuned.
+
+    `comparison` names the direction that FAILS: "gt" fails when the measured
+    value is greater than `value`. `fault` is the id raised on failure; None
+    marks a completion gate, which decides a score of 1 rather than a named
+    fault.
+
+    A check with `measurement=None` is one the scorer evaluates from positions
+    it never writes to `measurements` - there is no number to line it up
+    against, so it carries `rule` for display and is evaluated inline in the
+    scoring method instead. Only two exist; both are noted where they are used.
+    """
+
+    key: str
+    label: str
+    measurement: str | None = None
+    comparison: str | None = None
+    value: float | None = None
+    unit: str | None = None
+    fault: str | None = None
+    rule: str | None = None
+
+    @property
+    def kind(self) -> str:
+        return "fault" if self.fault is not None else "completion"
+
+    def fails(self, measured: float | None) -> bool:
+        if measured is None or self.value is None or self.comparison is None:
+            return False
+        if self.comparison == "gt":
+            return measured > self.value
+        return measured < self.value
+
+
+# Shoulder mobility does not use fault cutoffs: it maps a distance straight to
+# a score through these bands, so it is declared separately.
+SHOULDER_SCORE_3_MAX_HAND_LENGTHS = 1.0
+SHOULDER_SCORE_2_MAX_HAND_LENGTHS = 1.5
+
+# The hurdle step's single-leg check compares left/right differences that are
+# never written to measurements, so it cannot be evaluated from the threshold
+# table. The bound still lives here rather than inline, so the rule text below
+# and the comparison in the scoring method cannot disagree.
+HURDLE_SINGLE_LEG_MAX_ASYMMETRY_DEG = 12.0
+
+THRESHOLDS: dict[str, tuple[Check, ...]] = {
+    "deep_squat": (
+        Check("depth_knee", "depth", "kneeAngle", "gt", 115.0, "°", "insufficient_depth"),
+        Check("depth_hip", "depth", "hipAngle", "gt", 125.0, "°", "insufficient_depth"),
+        Check("trunk_lean", "trunk lean", "trunkLeanDeg", "gt", 32.0, "°", "trunk_leans_forward"),
+        Check("valgus", "valgus", "kneeMedialOffset", "gt", 0.10, "torso", "knees_inward_valgus"),
+        Check(
+            "arms_overhead",
+            "arms overhead",
+            fault="arms_not_maintained_overhead",
+            rule="wrists drop below shoulders",
+        ),
+        Check("complete_knee", "completion", "kneeAngle", "gt", 140.0, "°"),
+        Check("complete_hip", "completion", "hipAngle", "gt", 145.0, "°"),
+    ),
+    "hurdle_step": (
+        Check("clearance", "clearance", "stepHeightNorm", "lt", 0.16, "leg", "insufficient_step_clearance"),
+        Check("pelvis_tilt", "pelvis tilt", "pelvisTiltNorm", "gt", 0.18, "torso", "pelvis_tilt"),
+        Check("knee_rotation", "knee rotation", "kneeOffsetAbs", "gt", 0.30, "torso", "knee_internal_external_rotation"),
+        Check(
+            "single_leg_motion",
+            "single-leg motion",
+            fault="limited_single_leg_motion",
+            rule=(
+                "left/right hip and knee angles both differ by "
+                f"< {HURDLE_SINGLE_LEG_MAX_ASYMMETRY_DEG:.0f}°"
+            ),
+        ),
+        Check("complete_step", "completion", "stepHeightNorm", "lt", 0.10, "leg"),
+    ),
+    "inline_lunge": (
+        Check("knee_flexion", "descent", "kneeAngle", "gt", 125.0, "°", "insufficient_knee_flexion"),
+        Check("trunk_lean", "trunk lean", "trunkLeanDeg", "gt", 28.0, "°", "forward_trunk_lean"),
+        Check("complete_knee", "completion", "kneeAngle", "gt", 145.0, "°"),
+    ),
+    # Score bands, not cutoffs - see SHOULDER_SCORE_* above and threshold_spec().
+    "shoulder_mobility": (),
+    "active_straight_leg_raise": (
+        Check("leg_raise", "range", "raisedHipAngle", "gt", 110.0, "°", "insufficient_leg_raise"),
+        Check("raised_knee", "raised knee", "raisedKneeAngle", "lt", 155.0, "°", "same_side_knee_flexion"),
+        Check("opposite_knee", "opposite knee", "oppositeKneeAngle", "lt", 160.0, "°", "opposite_side_knee_flexion"),
+        Check("complete_hip", "completion", "raisedHipAngle", "gt", 135.0, "°"),
+    ),
+    "trunk_stability_pushup": (
+        Check("pushup_range", "range", "elbowAngle", "gt", 135.0, "°", "insufficient_pushup_range"),
+        Check("body_line", "body line", "bodyLineErrorNorm", "gt", 0.12, "body", "trunk_extension_or_sag"),
+        Check("knee_flexion", "knees", "kneeAngle", "lt", 150.0, "°", "knee_flexion"),
+        Check("complete_elbow", "completion", "elbowAngle", "gt", 160.0, "°"),
+    ),
+    "rotary_stability": (
+        Check("elbow_knee_touch", "touch", "elbowKneeDistanceNorm", "gt", 0.40, "limb", "fail_to_touch_elbow_to_knee"),
+        Check("complete_touch", "completion", "elbowKneeDistanceNorm", "gt", 0.60, "limb"),
+    ),
+}
+
+
+def checks_for(test_id: str) -> tuple[Check, ...]:
+    return THRESHOLDS.get(test_id, ())
+
+
+def _fires(test_id: str, fault: str, values: dict[str, float | None]) -> bool:
+    """True when any declared check for this fault is breached.
+
+    Several checks for one fault are OR-ed: the deep squat's depth fault fires
+    on either the knee or the hip angle.
+    """
+    return any(
+        check.fails(values.get(check.measurement))
+        for check in checks_for(test_id)
+        if check.fault == fault and check.measurement is not None
+    )
+
+
+def _incomplete(test_id: str, values: dict[str, float | None]) -> bool:
+    """True when any completion gate is breached, which scores 1."""
+    return any(
+        check.fails(values.get(check.measurement))
+        for check in checks_for(test_id)
+        if check.fault is None and check.measurement is not None
+    )
+
+
+def threshold_spec() -> dict[str, Any]:
+    """Every threshold, for the app to show beside the measurements it judged."""
+    tests = []
+    for test_id, info in FMS_TESTS.items():
+        entry: dict[str, Any] = {
+            "testId": test_id,
+            "testName": info["name"],
+            "checks": [
+                {
+                    "key": check.key,
+                    "label": check.label,
+                    "measurement": check.measurement,
+                    "comparison": check.comparison,
+                    "value": check.value,
+                    "unit": check.unit,
+                    "fault": check.fault,
+                    "kind": check.kind,
+                    "rule": check.rule,
+                }
+                for check in checks_for(test_id)
+            ],
+        }
+        if test_id == "shoulder_mobility":
+            entry["scoreBands"] = [
+                {
+                    "maxHandLengths": SHOULDER_SCORE_3_MAX_HAND_LENGTHS,
+                    "score": 3,
+                    "fault": None,
+                    "measurement": "bestDistanceHandLengths",
+                },
+                {
+                    "maxHandLengths": SHOULDER_SCORE_2_MAX_HAND_LENGTHS,
+                    "score": 2,
+                    "fault": "hands_more_than_one_hand_length_apart",
+                    "measurement": "bestDistanceHandLengths",
+                },
+                {
+                    "maxHandLengths": None,
+                    "score": 1,
+                    "fault": "hands_more_than_one_and_half_hand_lengths_apart",
+                    "measurement": "bestDistanceHandLengths",
+                },
+            ]
+        tests.append(entry)
+    return {"tests": tests}
+
+
 @dataclass
 class FMSFrame:
     frame: int
@@ -218,21 +400,34 @@ class FMSScorer:
         wrist_height = _mean_y(frame, ["left_wrist", "right_wrist"])
         shoulder_height = _mean_y(frame, ["left_shoulder", "right_shoulder"])
 
+        # The values each check is evaluated against. Thresholds live in
+        # THRESHOLDS["deep_squat"]; only the direction of each comparison is
+        # described here, never the number.
+        values = {
+            "kneeAngle": knee_angle,
+            "hipAngle": hip_angle,
+            "trunkLeanDeg": trunk_lean,
+            "kneeMedialOffset": knee_offset,
+        }
+
         faults = []
-        if knee_angle > 115 or hip_angle > 125:
+        if _fires("deep_squat", "insufficient_depth", values):
             faults.append("insufficient_depth")
-        if trunk_lean > 32:
+        if _fires("deep_squat", "trunk_leans_forward", values):
             faults.append("trunk_leans_forward")
         # Only the medial (valgus) direction is scored. Across the reference
         # set 17 of 18 squats read lateral, so knees tracking outward is the
         # normal baseline here rather than a compensation, and any varus cut
         # would just slice the tail of that distribution at an arbitrary point.
-        if knee_offset > 0.10:
+        if _fires("deep_squat", "knees_inward_valgus", values):
             faults.append("knees_inward_valgus")
+        # Declared as the 'arms_overhead' check with no measurement: this
+        # compares two y positions that are never written to measurements, so
+        # it cannot be evaluated from the table and stays inline.
         if wrist_height is not None and shoulder_height is not None and wrist_height > shoulder_height:
             faults.append("arms_not_maintained_overhead")
 
-        complete = knee_angle <= 140 and hip_angle <= 145
+        complete = not _incomplete("deep_squat", values)
         return _score_from_faults(
             faults,
             complete,
@@ -254,17 +449,29 @@ class FMSScorer:
         knee_offset = abs(_knee_medial_offset(frame))
         step_height = _stepping_height(frame)
 
+        values = {
+            "stepHeightNorm": step_height,
+            "pelvisTiltNorm": pelvis_tilt,
+            "kneeOffsetAbs": knee_offset,
+        }
+
         faults = []
-        if step_height < 0.16:
+        if _fires("hurdle_step", "insufficient_step_clearance", values):
             faults.append("insufficient_step_clearance")
-        if pelvis_tilt > 0.18:
+        if _fires("hurdle_step", "pelvis_tilt", values):
             faults.append("pelvis_tilt")
-        if knee_offset > 0.30:
+        if _fires("hurdle_step", "knee_internal_external_rotation", values):
             faults.append("knee_internal_external_rotation")
-        if hip_asym < 12 and knee_asym < 12:
+        # Declared as the 'single_leg_motion' check with no measurement: these
+        # are left/right differences, not values the scorer records, and the
+        # two must both hold, so it stays inline.
+        if (
+            hip_asym < HURDLE_SINGLE_LEG_MAX_ASYMMETRY_DEG
+            and knee_asym < HURDLE_SINGLE_LEG_MAX_ASYMMETRY_DEG
+        ):
             faults.append("limited_single_leg_motion")
 
-        complete = step_height >= 0.10
+        complete = not _incomplete("hurdle_step", values)
         return _score_from_faults(
             faults,
             complete,
@@ -287,13 +494,15 @@ class FMSScorer:
         # knee_alignment_compensation and balance_or_pelvis_shift are dropped:
         # both are frontal-plane quantities and this test is filmed sagittally,
         # where they are unrecoverable rather than merely noisy. See notAssessed.
+        values = {"kneeAngle": knee_angle, "trunkLeanDeg": trunk_lean}
+
         faults = []
-        if knee_angle > 125:
+        if _fires("inline_lunge", "insufficient_knee_flexion", values):
             faults.append("insufficient_knee_flexion")
-        if trunk_lean > 28:
+        if _fires("inline_lunge", "forward_trunk_lean", values):
             faults.append("forward_trunk_lean")
 
-        complete = knee_angle <= 145
+        complete = not _incomplete("inline_lunge", values)
         return _score_from_faults(
             faults,
             complete,
@@ -417,15 +626,21 @@ class FMSScorer:
         # pelvis_lift_or_rotation is dropped: the subject is supine and filmed
         # from the side, so the pelvis L-R axis points at the camera and
         # obliquity cannot be separated from rotation. See notAssessed.
+        values = {
+            "raisedHipAngle": raised_hip,
+            "raisedKneeAngle": raised_knee,
+            "oppositeKneeAngle": opposite_knee,
+        }
+
         faults = []
-        if raised_hip > 110:
+        if _fires("active_straight_leg_raise", "insufficient_leg_raise", values):
             faults.append("insufficient_leg_raise")
-        if raised_knee < 155:
+        if _fires("active_straight_leg_raise", "same_side_knee_flexion", values):
             faults.append("same_side_knee_flexion")
-        if opposite_knee < 160:
+        if _fires("active_straight_leg_raise", "opposite_side_knee_flexion", values):
             faults.append("opposite_side_knee_flexion")
 
-        complete = raised_hip <= 135
+        complete = not _incomplete("active_straight_leg_raise", values)
         return _score_from_faults(
             faults,
             complete,
@@ -449,15 +664,28 @@ class FMSScorer:
         elbow_angle = _avg_angle(frame, ["left_elbow_angle", "right_elbow_angle"], 180)
         knee_angle = _avg_angle(frame, ["left_knee_angle", "right_knee_angle"], 180)
 
+        values = {
+            "elbowAngle": elbow_angle,
+            "bodyLineErrorNorm": body_sag,
+            "kneeAngle": knee_angle,
+        }
+
         faults = []
-        if elbow_angle > 135:
+        if _fires("trunk_stability_pushup", "insufficient_pushup_range", values):
             faults.append("insufficient_pushup_range")
-        if body_sag > 0.12:
+        if _fires("trunk_stability_pushup", "trunk_extension_or_sag", values):
             faults.append("trunk_extension_or_sag")
-        if knee_angle < 150:
+        if _fires("trunk_stability_pushup", "knee_flexion", values):
             faults.append("knee_flexion")
 
-        complete = shoulder_y is not None and hip_y is not None and ankle_y is not None and elbow_angle <= 160
+        # The completion gate is the declared elbow threshold plus a landmark
+        # presence requirement, which is not a threshold and so stays here.
+        complete = (
+            shoulder_y is not None
+            and hip_y is not None
+            and ankle_y is not None
+            and not _incomplete("trunk_stability_pushup", values)
+        )
         return _score_from_faults(
             faults,
             bool(complete),
@@ -481,11 +709,13 @@ class FMSScorer:
         # 0.40 sits in the empty band of the reference distribution: 16 of 18
         # attempts land at or below 0.284 and the two genuine misses at 0.817.
         # A tighter cut would clip the top of the successful cluster instead.
+        values = {"elbowKneeDistanceNorm": touch_distance}
+
         faults = []
-        if touch_distance > 0.40:
+        if _fires("rotary_stability", "fail_to_touch_elbow_to_knee", values):
             faults.append("fail_to_touch_elbow_to_knee")
 
-        complete = touch_distance <= 0.60
+        complete = not _incomplete("rotary_stability", values)
         return _score_from_faults(
             faults,
             complete,
@@ -555,9 +785,9 @@ def _score_from_faults(
 
 
 def _score_shoulder_distance(distance_in: float, hand_length_in: float) -> int:
-    if distance_in <= hand_length_in:
+    if distance_in <= hand_length_in * SHOULDER_SCORE_3_MAX_HAND_LENGTHS:
         return 3
-    if distance_in <= hand_length_in * 1.5:
+    if distance_in <= hand_length_in * SHOULDER_SCORE_2_MAX_HAND_LENGTHS:
         return 2
     return 1
 

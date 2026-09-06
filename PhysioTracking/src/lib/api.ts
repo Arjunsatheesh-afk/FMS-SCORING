@@ -2,7 +2,13 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { File, UploadType } from 'expo-file-system';
 
-import { AnalysisJob, FmsExercise, FmsTestId, StoredResult } from '@/types/analysis';
+import {
+  AnalysisJob,
+  FmsExercise,
+  FmsTestId,
+  FmsTestThresholds,
+  StoredResult,
+} from '@/types/analysis';
 import { AuthUser, RegisterPatientInput, SignInResult } from '@/types/auth';
 
 const DEFAULT_API_BASE_URL =
@@ -99,6 +105,17 @@ export async function fetchPatients(token: string) {
 export async function fetchExercises() {
   const response = await fetch(`${API_BASE_URL}/exercises`);
   return parseJson<{ exercises: FmsExercise[] }>(response);
+}
+
+/**
+ * Every threshold the scorer applies, served from the same objects
+ * fms_scoring.py evaluates. Static and public — it describes the rules, not
+ * any patient — so it needs no token.
+ */
+export async function fetchThresholds() {
+  const response = await fetch(`${API_BASE_URL}/fms/thresholds`);
+  const body = await parseJson<{ tests: FmsTestThresholds[] }>(response);
+  return body.tests;
 }
 
 export async function fetchMyResults(token: string) {

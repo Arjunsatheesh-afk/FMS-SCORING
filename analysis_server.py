@@ -30,7 +30,7 @@ from fms_pipeline import (
     extract_video_pose,
     score_tracked_file,
 )
-from fms_scoring import FMS_TESTS, normalize_test_name
+from fms_scoring import FMS_TESTS, normalize_test_name, threshold_spec
 
 SCRIPT_DIR = Path(__file__).parent
 OUTPUT_DIR = Path(os.getenv("PHYSIO_FMS_OUTPUT_DIR", str(SCRIPT_DIR / "fms_outputs" / "api")))
@@ -204,7 +204,61 @@ def _analyze_video_job(
             pass
 
 
+def _annotated_path(job_id: str) -> Path:
+    """Where one screening's skeleton-overlay video lives."""
+    return ANNOTATED_DIR / f"{job_id}.mp4"
+
+
+def _delete_annotated_video(job_id: str) -> bool:
+    """Remove one screening's overlay file. True if a file was actually removed."""
+    try:
+        _annotated_path(job_id).unlink()
+        return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        # A file that is locked or unreadable must not fail the deletion of the
+        # row it belongs to. It becomes an orphan, which the sweep below clears
+        # on the next start.
+        return False
+
+
+def sweep_orphaned_annotations() -> list[str]:
+    """Delete overlay videos that no longer have a screening behind them.
+
+    Deleting through the API removes the row and the file together, but two
+    paths still leave a file behind: a row removed out of band (straight through
+    sqlite, which is how the first orphans appeared), and a render that
+    succeeded just before save_result failed. This reconciles both.
+
+    Only safe at startup. The overlay is written *before* the row is saved, so a
+    sweep running alongside a live job would delete that job's video out from
+    under it; a freshly started process has no jobs in flight.
+    """
+    if not ANNOTATED_DIR.exists():
+        return []
+
+    try:
+        known = auth_store.all_result_job_ids()
+    except Exception as exc:  # pragma: no cover - housekeeping must not block boot
+        print(f"[analysis_server] skipped overlay sweep: {type(exc).__name__}: {exc}")
+        return []
+
+    removed = [
+        path.name
+        for path in sorted(ANNOTATED_DIR.glob("*.mp4"))
+        if path.stem not in known and _delete_annotated_video(path.stem)
+    ]
+    if removed:
+        print(
+            f"[analysis_server] removed {len(removed)} orphaned overlay "
+            f"video(s): {', '.join(removed)}"
+        )
+    return removed
+
+
 auth_store.init_db()
+sweep_orphaned_annotations()
 
 
 class LoginRequest(BaseModel):
@@ -324,7 +378,7 @@ def annotated_video(
     if auth_store.patient_of_doctor(doctor["id"], stored["patientId"]) is None:
         raise HTTPException(status_code=403, detail="Not one of your patients")
 
-    path = ANNOTATED_DIR / f"{job_id}.mp4"
+    path = _annotated_path(job_id)
     if not path.exists():
         raise HTTPException(status_code=404, detail="No annotated video for this screening")
 
@@ -335,6 +389,37 @@ def annotated_video(
         # Byte ranges let a player seek without pulling the whole file.
         headers={"Accept-Ranges": "bytes"},
     )
+
+
+@app.delete("/results/{job_id}")
+def delete_screening(
+    job_id: str,
+    doctor: dict[str, Any] = Depends(current_doctor),
+) -> dict[str, Any]:
+    """Delete one screening together with its skeleton-overlay video.
+
+    Gated exactly like the video route: doctor role, and the screening must
+    belong to one of *their* patients.
+
+    The row goes first, then the file. That order matters: a failed file delete
+    leaves an orphaned video, which is harmless and gets swept at the next
+    start, whereas deleting the file first and then failing to delete the row
+    would leave a screening on record whose video 404s.
+    """
+    stored = auth_store.result_for_job(job_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Screening not found")
+    if auth_store.patient_of_doctor(doctor["id"], stored["patientId"]) is None:
+        raise HTTPException(status_code=403, detail="Not one of your patients")
+
+    if auth_store.delete_result(job_id) is None:
+        raise HTTPException(status_code=404, detail="Screening not found")
+
+    return {
+        "status": "deleted",
+        "jobId": job_id,
+        "videoRemoved": _delete_annotated_video(job_id),
+    }
 
 
 @app.get("/me/results")
@@ -351,6 +436,18 @@ def patient_results(
     if patient is None:
         raise HTTPException(status_code=403, detail="Not one of your patients")
     return {"patient": patient, "results": auth_store.results_for_patient(patient_id)}
+
+
+@app.get("/fms/thresholds")
+def fms_thresholds() -> dict[str, Any]:
+    """Every threshold the scorer applies, so a report can show each
+    measurement beside the number it was judged against.
+
+    Served straight from the objects `fms_scoring` evaluates, so this cannot
+    disagree with how a screening was actually scored. Static and public, like
+    /exercises - it describes the rules, not any patient.
+    """
+    return threshold_spec()
 
 
 @app.get("/health")

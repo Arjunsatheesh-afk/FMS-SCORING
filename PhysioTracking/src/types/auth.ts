@@ -8,6 +8,11 @@ export interface AuthUser {
   phoneNumber: string;
   createdBy: number | null;
   createdAt: string;
+  /**
+   * How many screenings this patient has. Only GET /patients returns it, so it
+   * is absent on the signed-in user and on a freshly registered patient.
+   */
+  screeningCount?: number;
 }
 
 export interface SignInResult {

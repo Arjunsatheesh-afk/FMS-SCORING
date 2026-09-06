@@ -411,9 +411,39 @@ against 2 result rows. The three orphans (`42569971-…f081d29c`, `4c0e9ba1-…4
 result row referenced them and that both surviving screenings still have their overlay.
 Two files remain, one per result row.
 
-Note that nothing currently cleans these up automatically: a screening whose row is
-deleted leaves its overlay behind. Worth a periodic sweep, or deleting the file alongside
-the row.
+### Overlay cleanup (added 5 Sep 2026)
+
+The orphans above existed because **there was no deletion path in the application at
+all** — screenings were removed by hand through the sqlite CLI, which knows nothing about
+the video files. There is now one, and it owns both halves:
+
+- **`DELETE /results/{job_id}`** — deletes the row and its overlay together. Gated exactly
+  like the video route: doctor role, and the screening must belong to one of *their*
+  patients. Returns `{status, jobId, videoRemoved}`.
+- **`auth_store.delete_result(job_id)`** — deletes the row and returns what was removed,
+  reading and deleting under one lock so the caller learns exactly what it deleted.
+- **`sweep_orphaned_annotations()`** — runs at server startup, deleting overlay files with
+  no result row behind them.
+
+**Order is deliberate: the row goes first, then the file.** A failed file delete leaves an
+orphan, which is harmless and gets swept at the next start. Deleting the file first and
+then failing on the row would leave a screening on record whose video 404s — strictly
+worse.
+
+The startup sweep is what covers the cases an endpoint cannot: rows deleted out of band
+through sqlite, and a render that succeeded just before `save_result` failed (the overlay
+is written *before* the row is saved, so that window is real). It runs **only** at startup
+for exactly that reason — a sweep running alongside a live job would delete that job's
+video out from under it, and a freshly started process has no jobs in flight.
+
+Verified by booting the server against an isolated database: 19 checks covering the
+startup sweep (orphan removed, both files with rows kept), authorization
+(401/403/403/404, with nothing deleted by any refused attempt), the successful delete
+(row gone, **file gone**, neighbouring screening untouched), and the aftermath (video
+route 404s, second delete returns 404 not 500, surviving video still serves 200).
+
+**Not yet wired into the client** — there is no delete button in the app. The endpoint
+exists and is tested; the UI is a separate piece of work.
 
 ---
 
@@ -445,6 +475,16 @@ Served by `GET /results/{job_id}/video`, gated on `current_doctor` **and** an ow
 check against `patient_of_doctor` — a job id alone is not enough to fetch patient footage.
 Verified: doctor→200, patient→403, unauthenticated→401, unknown job→404.
 
+**Player box sizing.** The client used to hardcode `aspectRatio: 16/9` regardless of what
+was rendered. Both overlays currently on file are **1280×720**, so that happened to match
+and there was no visible letterboxing — an earlier claim that portrait footage was being
+padded into a 16:9 box was wrong. The box is now derived from the `width`/`height` the API
+reports (`overlayBoxStyle` in `patients/[id].tsx`): landscape fills the width, portrait is
+driven from a capped height and centred. `VideoView` has no natural-dimension prop, so
+this has to come from the data. It changes nothing for the current 16:9 renders and stops
+a portrait clip — likely the moment anyone records on a phone held upright — from
+letterboxing. Both branches were checked in the browser.
+
 ---
 
 ## 12. Client app
@@ -459,13 +499,85 @@ src/app/
   patient/               index (home), feedback, progress, profile, explore
                          — NO record tab, by design
   doctor/                index (roster), register-patient, profile,
-                         patients/[id].tsx, patients/[id]/record.tsx
+                         patients/[id].tsx, patients/[id]/record.tsx,
+                         patients/[id]/report.tsx
 src/lib/fms.ts           FAULT_LABELS (all 31 fault ids), formatFault, formatScore,
                          scoreColor, statusLabel, faultSummary, scoredSessions,
-                         averageScore, formatMeasurementKey/Value, uploaderLabel
+                         averageScore, formatMeasurementKey/Value, uploaderLabel,
+                         plus the report spec: FMS_TEST_ORDER, FMS_TEST_NAMES,
+                         BILATERAL_TESTS, MEASUREMENT_SPEC, NON_CLINICAL_MEASUREMENTS,
+                         finalScoreFor, buildReportRows, rawSubtotal
 src/lib/api.ts           All HTTP. Note the web/native branch in createAnalysisJob.
+src/lib/names.ts         initials(), shared by the roster and patient header.
 src/lib/use-authed-video-source.ts   Auth-gated video playback per platform.
+src/components/patient-view-switch.tsx   History / Report segmented switch.
 ```
+
+### The Report screen (added 5 Sep 2026)
+
+`/doctor/patients/[id]/report` — a per-patient FMS scoring sheet, reached by a
+**History | Report** switch on the patient screen rather than a tab (a report is
+per-patient, so a tab opened with no patient selected has nothing to show). The two
+views are separate routes so a report can be linked to and survives a reload;
+the switch uses `router.replace` so flipping between them does not stack history.
+
+Rules it encodes, all in `lib/fms.ts` rather than the screen:
+
+- **Seven rows always**, in clinical order. A test with no screening still gets a row
+  showing an em dash — a sheet that omits them hides what has not been done.
+- **The most recent screening per test** feeds its row (`buildReportRows`), with the date
+  shown so it is never ambiguous which attempt is on the sheet.
+- **Final Score is filled only for Deep Squat and Trunk Stability Push-Up**, where it
+  equals Raw. The five bilateral tests show a dashed *Pending* chip
+  (`BILATERAL_TESTS`, `finalScoreFor`) until side pairing exists — see item 4 below.
+- **`scoredFrame` never appears** (`NON_CLINICAL_MEASUREMENTS`). It is an internal frame
+  index; beside joint angles a clinician reads it as a finding. It is filtered from the
+  history view too.
+- **Units are attached** to every measurement (`MEASUREMENT_SPEC`) — degrees, torso
+  lengths, leg lengths, hand lengths, inches. Only on the report; the history view still
+  shows raw numbers.
+- **The composite is pending, not computed.** A raw subtotal is shown and explicitly
+  labelled *not the FMS composite* (`rawSubtotal`).
+- **No video on this screen.** Playback stays on the history view.
+
+### Thresholds beside measurements (added 6 Sep 2026)
+
+Each measurement on the report shows the threshold it was judged against —
+`Knee angle 169.8°  ✗ depth fault > 115.0°  ✗ not completed > 140.0°` — with the value
+turning red when any of its thresholds is breached.
+
+**There is exactly one copy of every threshold, in `fms_scoring.py`.** They were bare
+literals inside the `_score_*` methods; they are now `Check` objects in `THRESHOLDS`, and
+the scoring methods evaluate those same objects via `_fires()` and `_incomplete()`. The
+app gets them from **`GET /fms/thresholds`** (static, public, like `/exercises`), so the
+report cannot disagree with how a screening was actually scored.
+
+Four shapes the display handles, because the rules are not uniform:
+
+| Shape | Handling |
+|---|---|
+| Measurement with cutoffs | A chip per check, ✓ within or ✗ breached |
+| Measurement with none (hurdle step's knee and hip angle) | "no threshold — recorded for reference", so it is not read as judged |
+| Check with no stored value (deep squat arms-overhead, hurdle step single-leg motion) | Greyed, value "not recorded", rule in words. The scorer was **not** changed to store these. |
+| Shoulder mobility | Score *bands* (≤1.0 hand → 3, ≤1.5 → 2, >1.5 → 1), not cutoffs; the band the value landed in is highlighted, not marked as a failure |
+
+A measurement can carry **two** thresholds — a fault cutoff and the completion gate that
+separates a 1 from a 2. Deep squat knee angle is checked at 115° and again at 140°.
+
+**Drift protection.** `test_fms_scoring.py` went from 3 tests to 11. Five of the new ones
+guard the declaration against the code: every emitted fault is declared and every declared
+fault is emitted (both read by AST-parsing the scoring methods), no scoring method compares
+against a numeric literal any more (only degenerate-geometry guards are allowed), every
+declared check names a measurement the scorer stores, and the served spec covers all seven
+tests. Two more assert the declared numbers are the ones actually applied.
+
+**Verified score-neutral.** All 126 cached videos were re-scored from their pose JSON and
+diffed against `all_samples_report.json`: **0 score changes, 0 fault changes, 0 measurement
+changes**, 126/126 matched.
+
+Thresholds are fetched **live**, so a historical screening is shown against today's
+numbers. Storing them per result at scoring time is the accurate answer and is worth doing
+once the department signs the numbers off — that is when the distinction starts to matter.
 
 ### Platform quirks that cost real time — do not re-discover these
 
@@ -504,11 +616,13 @@ src/lib/use-authed-video-source.ts   Auth-gated video playback per platform.
    It ends with six ranked questions. Send it; the highest-priority asks are whether the
    angle thresholds are right and how the push-up should be scored.
 
-2. **Report format.** The department said they would discuss it. Undecided: layout of the
-   patient-facing summary, and whether to sum a **21-point composite FMS score**.
-   `summarize_screen()` in `fms_scoring.py` already computes a composite
-   (`score`, `maxScore`, `automatedMaxScore`, `standardMaxScore: 21`, `weakestTests`) but
-   **nothing in the API or app calls it yet.**
+2. **Report format — partly built, still open.** The doctor-facing scoring sheet exists
+   (see section 12). What remains blocked on the department: whether to sum a **21-point
+   composite FMS score**, and the layout of any *patient*-facing summary — the report is
+   doctor-only today. `summarize_screen()` in `fms_scoring.py` already computes a
+   composite (`score`, `maxScore`, `automatedMaxScore`, `standardMaxScore: 21`,
+   `weakestTests`) but **nothing in the API or app calls it**, deliberately: it would sum
+   raw scores, and five of the seven need side pairing before a composite is meaningful.
 
 3. **Manual FMS score comparison.** The department is producing manually-scored results
    for comparison against the automated scores. Nothing to do until those arrive; when
@@ -524,14 +638,23 @@ src/lib/use-authed-video-source.ts   Auth-gated video playback per platform.
    test or reliable side detection within one — so the department has to agree the
    protocol before the code changes. **Do not start this without that decision.**
 
-5. **UI overhaul — raised, scope not yet defined.** No specification exists yet. Current
-   state for whoever scopes it: the app works end-to-end on web and native, with a
-   functional but plain visual treatment (flat cards, `#10b7aa` teal accent, system
-   fonts). The screen inventory is in section 12. Nothing is blocking it technically.
+5. **UI pass — done for the doctor's roster and patient screens (5 Sep 2026).**
+   Roster: doctor's name moved above the title, phone number dropped from rows in favour
+   of a screening count, name 15→16 px, 560 px max width. Patient screen: avatar in the
+   header, outlined rather than solid "New screening", 620 px max width. Screening
+   detail: measurement and fault text 12/13→14 px with row dividers, `scoredFrame`
+   removed, overlay box sized from the render.
 
-6. ~~Three orphaned annotated `.mp4` files.~~ **Done 5 Sep 2026** — deleted, see section
-   10. What remains open is that orphans are not cleaned up automatically when a result
-   row is deleted.
+   **Still open** — the screening detail's *arrangement* was deliberately left alone at
+   the user's request (faults still bullet text below the video rather than chips above
+   it, no tinted measurement panel, no units on that view). The patient-side screens have
+   had no pass at all.
+
+6. ~~Three orphaned annotated `.mp4` files, and no automatic cleanup when a result row is
+   deleted.~~ **Done 5 Sep 2026.** The orphans were deleted and the underlying gap is
+   closed: `DELETE /results/{job_id}` now removes the row and its overlay together, and a
+   startup sweep reconciles anything deleted out of band. See section 10. The one piece
+   left is a delete control in the app — the endpoint has no client yet.
 
 ### Known technical debt
 
@@ -544,10 +667,12 @@ src/lib/use-authed-video-source.ts   Auth-gated video playback per platform.
    The working `.venv/` was assembled by hand. Splitting this into a real
    `requirements-win.txt` is unfinished work.
 
-9. **Test coverage is thin** — `test_fms_scoring.py` has **3 tests** for a rule engine
-   with roughly 31 distinct fault paths across 7 tests. The camera-angle rewrite was
-   validated by re-running the full 126-video batch and diffing, not by unit tests. That
-   validation does not survive as a regression guard.
+9. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
+   **11 tests** with the threshold work (section 12), which now guards the declared
+   thresholds against the scoring code. Still missing: per-fault behavioural coverage for
+   the other six tests — only the deep squat's depth fault is exercised end to end — and
+   nothing at all covers `analysis_server.py` or `auth_store.py`, both of which have been
+   verified only by driving a running server by hand.
 
 10. **README does not document the auth system or roles.** It was updated for the
     camera-angle fix (`61d300e`) but not for anything after `a4634d6`.

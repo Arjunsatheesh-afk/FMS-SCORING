@@ -280,16 +280,25 @@ def change_password(user_id: int, current_password: str, new_password: str, *, k
 
 
 def list_patients_for_doctor(doctor_id: int) -> list[dict[str, Any]]:
+    """Patients this doctor registered, each with its screening count.
+
+    The count is joined in here rather than fetched per patient afterwards: the
+    roster shows it on every row, so a follow-up query each would be one round
+    trip per patient for a single integer.
+    """
     with _lock, _connect() as connection:
         rows = connection.execute(
             """
-            SELECT * FROM users
-            WHERE role = 'patient' AND created_by = ?
-            ORDER BY display_name COLLATE NOCASE
+            SELECT users.*, COUNT(results.id) AS screening_count
+            FROM users
+            LEFT JOIN results ON results.patient_id = users.id
+            WHERE users.role = 'patient' AND users.created_by = ?
+            GROUP BY users.id
+            ORDER BY users.display_name COLLATE NOCASE
             """,
             (doctor_id,),
         ).fetchall()
-    return [_row_to_user(row) for row in rows]
+    return [_row_to_user(row) | {"screeningCount": row["screening_count"]} for row in rows]
 
 
 def get_user(user_id: int) -> dict[str, Any] | None:
@@ -375,6 +384,41 @@ def result_for_job(job_id: str) -> dict[str, Any] | None:
             (job_id,),
         ).fetchone()
     return _row_to_result(row) if row else None
+
+
+def delete_result(job_id: str) -> dict[str, Any] | None:
+    """Delete one stored result, returning what was removed, or None if absent.
+
+    The read and the delete share a single lock, so the caller learns exactly
+    what it deleted rather than what happened to be there a moment earlier.
+    That returned record is what callers use to clean up the screening's
+    artefacts on disk.
+    """
+    with _lock, _connect() as connection:
+        row = connection.execute(
+            """
+            SELECT results.*, uploader.display_name AS uploaded_by_name
+            FROM results
+            LEFT JOIN users AS uploader ON uploader.id = results.uploaded_by
+            WHERE results.job_id = ?
+            """,
+            (job_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        connection.execute("DELETE FROM results WHERE job_id = ?", (job_id,))
+    return _row_to_result(row)
+
+
+def all_result_job_ids() -> set[str]:
+    """Every job id that still has a stored result.
+
+    Used to reconcile on-disk artefacts against the database: anything on disk
+    that is not in this set has no screening behind it any more.
+    """
+    with _lock, _connect() as connection:
+        rows = connection.execute("SELECT job_id FROM results").fetchall()
+    return {row["job_id"] for row in rows}
 
 
 def results_for_patient(patient_id: int) -> list[dict[str, Any]]:

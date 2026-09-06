@@ -4,9 +4,11 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PatientViewSwitch } from '@/components/patient-view-switch';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, fetchPatientResults } from '@/lib/api';
 import {
+  NON_CLINICAL_MEASUREMENTS,
   faultSummary,
   formatFault,
   formatMeasurementKey,
@@ -15,6 +17,7 @@ import {
   scoreColor,
   statusLabel,
 } from '@/lib/fms';
+import { initials } from '@/lib/names';
 import { useAuthedVideoSource } from '@/lib/use-authed-video-source';
 import { AuthUser } from '@/types/auth';
 import { StoredResult } from '@/types/analysis';
@@ -74,19 +77,38 @@ export default function PatientDetailScreen() {
   );
   const player = useVideoPlayer(videoSource);
 
+  // The overlay is rendered at the source footage's own shape, which for these
+  // screenings is portrait. A fixed 16:9 box padded that into a mostly-black
+  // slab, so the box takes its ratio from the render the API reports.
+  // VideoView has no natural-dimension prop, so this has to come from the data.
+  const overlay = openRow?.result?.annotatedVideo;
+  const videoBoxStyle = overlayBoxStyle(overlay?.width, overlay?.height);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.column}>
         <Pressable onPress={() => router.back()}>
           <Text style={styles.back}>‹ Patients</Text>
         </Pressable>
 
-        <Text style={styles.heading}>{patient?.displayName ?? 'Patient'}</Text>
-        {patient ? (
-          <Text style={styles.subheading}>
-            {patient.email} · {patient.phoneNumber}
-          </Text>
-        ) : null}
+        <View style={styles.patientHead}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {initials(patient?.displayName ?? '?')}
+            </Text>
+          </View>
+          <View style={styles.patientHeadInfo}>
+            <Text style={styles.heading}>{patient?.displayName ?? 'Patient'}</Text>
+            {patient ? (
+              <Text style={styles.subheading} numberOfLines={1}>
+                {patient.email} · {patient.phoneNumber}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        {id ? <PatientViewSwitch patientId={String(id)} active="history" /> : null}
 
         <Pressable
           style={styles.primary}
@@ -96,7 +118,7 @@ export default function PatientDetailScreen() {
               params: { id: String(id), name: patient?.displayName ?? '' },
             })
           }>
-          <Text style={styles.primaryText}>New screening</Text>
+          <Text style={styles.primaryText}>+ New screening</Text>
         </Pressable>
 
         {loading ? (
@@ -155,14 +177,14 @@ export default function PatientDetailScreen() {
                         <>
                           <Text style={styles.detailTitle}>Skeleton overlay</Text>
                           {videoLoading ? (
-                            <View style={styles.videoLoading}>
+                            <View style={[styles.videoLoading, videoBoxStyle]}>
                               <ActivityIndicator color="#10b7aa" />
                             </View>
                           ) : videoError ? (
                             <Text style={styles.videoError}>{videoError}</Text>
                           ) : (
                             <VideoView
-                              style={styles.video}
+                              style={[styles.video, videoBoxStyle]}
                               player={player}
                               nativeControls
                               contentFit="contain"
@@ -200,6 +222,9 @@ export default function PatientDetailScreen() {
 
                       <Text style={styles.detailTitle}>Measurements</Text>
                       {Object.entries(row.result.measurements ?? {})
+                        // scoredFrame and friends are internal bookkeeping, not
+                        // clinical findings, and must not sit beside joint angles.
+                        .filter(([key]) => !NON_CLINICAL_MEASUREMENTS.has(key))
                         .map(([key, value]) => [key, formatMeasurementValue(value)] as const)
                         .filter((entry): entry is readonly [string, string] => entry[1] !== null)
                         .map(([key, value]) => (
@@ -215,25 +240,63 @@ export default function PatientDetailScreen() {
             })}
           </View>
         )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+/** Tallest a portrait overlay may be, so it cannot swallow the whole card. */
+const MAX_VIDEO_HEIGHT = 380;
+
+/**
+ * A box shaped like the rendered overlay rather than a fixed 16:9.
+ *
+ * Landscape fills the available width. Portrait is driven from its height
+ * instead - a full-width portrait box would be taller than the screen on
+ * anything wider than a phone - and centred, so the card keeps its margins.
+ */
+function overlayBoxStyle(width?: number, height?: number) {
+  if (!width || !height) {
+    return { width: '100%' as const, aspectRatio: 16 / 9 };
+  }
+  const ratio = width / height;
+  if (ratio >= 1) {
+    return { width: '100%' as const, aspectRatio: ratio };
+  }
+  return { height: MAX_VIDEO_HEIGHT, aspectRatio: ratio, alignSelf: 'center' as const };
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#edf0f4' },
-  container: { padding: 18, gap: 12, paddingBottom: 86 },
-  back: { color: '#10b7aa', fontWeight: '700', fontSize: 14 },
-  heading: { fontSize: 28, fontWeight: '800', color: '#1f2937' },
-  subheading: { color: '#64748b', fontSize: 13 },
-  primary: {
+  container: { padding: 18, paddingBottom: 86 },
+  // Matches the report screen so the two views keep the same measure.
+  column: { width: '100%', maxWidth: 620, alignSelf: 'center', gap: 12 },
+  back: { color: '#0f9f95', fontWeight: '700', fontSize: 14 },
+  patientHead: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  patientHeadInfo: { flex: 1, minWidth: 0 },
+  avatar: {
+    width: 46,
     height: 46,
-    borderRadius: 12,
-    backgroundColor: '#10b7aa',
+    borderRadius: 14,
+    backgroundColor: '#d6f5f2',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: '#ffffff', fontWeight: '800' },
+  avatarText: { color: '#0f9f95', fontWeight: '800', fontSize: 15 },
+  heading: { fontSize: 24, fontWeight: '800', color: '#1f2937', letterSpacing: -0.3 },
+  subheading: { color: '#64748b', fontSize: 13 },
+  // Outlined rather than solid: the results below are the subject of the
+  // screen, and a full-width teal bar outshouted them.
+  primary: {
+    height: 44,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#10b7aa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryText: { color: '#0f9f95', fontWeight: '700', fontSize: 14 },
   loader: { marginTop: 20 },
   card: { backgroundColor: '#ffffff', borderRadius: 16, padding: 14, gap: 6 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#1f2937' },
@@ -248,16 +311,23 @@ const styles = StyleSheet.create({
   detail: { paddingBottom: 12, gap: 4 },
   detailLine: { fontSize: 12, color: '#64748b', marginBottom: 4 },
   detailTitle: { fontSize: 13, fontWeight: '700', color: '#334155', marginTop: 8 },
-  fault: { fontSize: 13, color: '#dc5f5f' },
-  notAssessed: { fontSize: 13, color: '#94a3b8' },
-  measurement: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 3 },
-  measurementKey: { flex: 1, fontSize: 12, color: '#334155' },
-  measurementValue: { fontSize: 12, fontWeight: '700', color: '#1f2937' },
-  video: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10, backgroundColor: '#000000' },
+  fault: { fontSize: 14, color: '#dc5f5f', lineHeight: 20 },
+  notAssessed: { fontSize: 14, color: '#94a3b8', lineHeight: 20 },
+  measurement: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  measurementKey: { flex: 1, fontSize: 14, color: '#475569' },
+  measurementValue: { fontSize: 14, fontWeight: '700', color: '#1f2937' },
+  // Dimensions come from overlayBoxStyle; this carries only the chrome.
+  video: { borderRadius: 10, backgroundColor: '#000000' },
   videoError: { fontSize: 12, color: '#dc5f5f', marginTop: 4 },
   videoLoading: {
-    width: '100%',
-    aspectRatio: 16 / 9,
     borderRadius: 10,
     backgroundColor: '#0f172a',
     alignItems: 'center',

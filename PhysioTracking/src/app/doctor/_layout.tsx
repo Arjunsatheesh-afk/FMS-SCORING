@@ -38,6 +38,7 @@ export default function DoctorLayout() {
       {/* Reached from the roster, not the tab bar. */}
       <Tabs.Screen name="patients/[id]" options={{ href: null }} />
       <Tabs.Screen name="patients/[id]/record" options={{ href: null }} />
+      <Tabs.Screen name="patients/[id]/report" options={{ href: null }} />
     </Tabs>
   );
 }

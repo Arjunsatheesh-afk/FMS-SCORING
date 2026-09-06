@@ -20,6 +20,42 @@ export interface FmsExercise {
 }
 
 /**
+ * One threshold the scorer applies, as served by GET /fms/thresholds.
+ *
+ * `comparison` is the direction that FAILS: 'gt' fails when the measured value
+ * is greater than `value`. `fault` is null for a completion gate, which decides
+ * a score of 1 rather than a named fault. `measurement` is null for the two
+ * checks the scorer evaluates from positions it never records — those carry
+ * `rule` instead and have no value to show.
+ */
+export interface FmsCheck {
+  key: string;
+  label: string;
+  measurement: string | null;
+  comparison: 'gt' | 'lt' | null;
+  value: number | null;
+  unit: string | null;
+  fault: string | null;
+  kind: 'fault' | 'completion';
+  rule: string | null;
+}
+
+/** Shoulder mobility maps a distance straight to a score, with no cutoffs. */
+export interface FmsScoreBand {
+  maxHandLengths: number | null;
+  score: number;
+  fault: string | null;
+  measurement: string;
+}
+
+export interface FmsTestThresholds {
+  testId: FmsTestId;
+  testName: string;
+  checks: FmsCheck[];
+  scoreBands?: FmsScoreBand[];
+}
+
+/**
  * Measurements vary per test, so only the widely shared keys are named.
  * `scoredFrame` is the frame the scorer picked as the scoring moment; it is
  * absent when no frame could be scored (pain reported, insufficient data).
