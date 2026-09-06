@@ -84,15 +84,12 @@ FMS_TESTS = {
         "aliases": ["exercise 6", "trunk stability push up", "push-up", "pushup"],
     },
     "rotary_stability": {
-        # The physiotherapy department's official name is "Rotatory Stability".
-        # The test_id stays `rotary_stability` - it is referenced by stored
-        # results, the threshold table and the app's route data - so only the
-        # display name follows their terminology.
-        "name": "Rotatory Stability",
+        "name": "Rotary Stability",
         "max_score": 3,
         "automated": True,
-        # Both spellings resolve: the dataset folders and the department both
-        # use "rotatory", while existing tooling and CLI input use "rotary".
+        # "rotatory" is an input spelling only - the dataset folders use it and
+        # the department sometimes does too, so it must resolve here. The
+        # display name above stays "Rotary Stability".
         "aliases": ["exercise 7", "rotary stability", "rotatory stability"],
     },
 }

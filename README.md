@@ -309,7 +309,7 @@ The automated scorer currently supports:
 4. Active Straight-Leg Raise
 5. Trunk Stability Push-Up
 6. Shoulder Mobility
-7. Rotatory Stability
+7. Rotary Stability
 
 Shoulder Mobility uses wrist-to-wrist distance as the camera proxy for the
 closest fist-to-fist distance. The default hand length is `8` inches, matching
@@ -401,8 +401,8 @@ dropped for the tests filmed sagittally, and each dropped check is listed in
 `measurements.notAssessed` in the scoring output, with the reasoning in the
 commit message for `2a59c37`.
 
-As a result **inline lunge and rotatory stability retain fewer checks than the
-FMS defines**, so most attempts now pass what remains and their scores read high.
+As a result **inline lunge and rotary stability retain fewer checks than the FMS
+defines**, so most attempts now pass what remains and their scores read high.
 Treat those two as provisional until frontal-camera footage or 3D pose
 estimation is available; they are not clinically meaningful as they stand.
 

@@ -23,7 +23,7 @@ import { AuthUser } from '@/types/auth';
 import { StoredResult } from '@/types/analysis';
 
 /**
- * Inline lunge and rotatory stability lost checks that cannot be recovered from
+ * Inline lunge and rotary stability lost checks that cannot be recovered from
  * the camera angle this dataset is filmed at, so their scores read high. A
  * doctor-facing screen must not present them as settled clinical findings.
  */

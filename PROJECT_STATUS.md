@@ -222,7 +222,7 @@ measured. Torso was chosen after measuring, not assumed.
   tracking outward is the normal baseline in this cohort, not a compensation. Any varus
   cut would have sliced the tail of that distribution at an arbitrary point.
 - Hurdle step pelvis tilt `> 0.18`, knee rotation `> 0.30`.
-- Rotatory stability fail-to-touch `0.25 → 0.40`, complete gate `<= 0.60`. The 0.40 sits in
+- Rotary stability fail-to-touch `0.25 → 0.40`, complete gate `<= 0.60`. The 0.40 sits in
   an empty band: 16 of 18 attempts land at or below 0.284 and the two genuine misses at
   0.817. A tighter cut would have clipped the top of the successful cluster.
 
@@ -245,7 +245,7 @@ viewing azimuth directly, and the seven tests split cleanly with nothing in betw
 | Inline Lunge | 0.21 | 0.14 | Sagittal |
 | Active Straight-Leg Raise | 0.11 | 0.19 | Sagittal |
 | Trunk Stability Push-Up | 0.19 | 0.21 | Sagittal |
-| Rotatory Stability | 0.14 | 0.20 | Sagittal |
+| Rotary Stability | 0.14 | 0.20 | Sagittal |
 
 Dropped checks, recorded in each result's `measurements.notAssessed` and surfaced in the
 app under *"Not assessed from this view"*:
@@ -254,10 +254,10 @@ app under *"Not assessed from this view"*:
 |---|---|---|
 | Inline Lunge | `knee_alignment_compensation`, `balance_or_pelvis_shift` | Both frontal-plane quantities; test is filmed sagittally. |
 | Active Straight-Leg Raise | `pelvis_lift_or_rotation` | Subject is supine and filmed from the side, so the pelvis L–R axis points at the camera. Obliquity cannot be separated from rotation. |
-| Rotatory Stability | `shoulder_or_pelvis_rotation`, `shoulder_lowering` | Both derive from transverse-segment tilt, unrecoverable from the sagittal view. The elbow-to-knee touch is kept because that movement happens in the plane the camera sees. |
+| Rotary Stability | `shoulder_or_pelvis_rotation`, `shoulder_lowering` | Both derive from transverse-segment tilt, unrecoverable from the sagittal view. The elbow-to-knee touch is kept because that movement happens in the plane the camera sees. |
 
 **Consequence, and it matters:** a dropped check can only push a score *up*, never down.
-Inline Lunge and Rotatory Stability therefore read high. The app marks both as
+Inline Lunge and Rotary Stability therefore read high. The app marks both as
 **provisional** with an amber banner (`PROVISIONAL_TESTS` in
 `PhysioTracking/src/app/doctor/patients/[id].tsx`).
 
@@ -292,7 +292,7 @@ Score distribution:
 | Shoulder Mobility | 1.56 | 13 | 0 | 5 |
 | Active Straight-Leg Raise | 2.44 | 0 | 10 | 8 |
 | Trunk Stability Push-Up | 3.00 | 0 | 0 | 18 |
-| Rotatory Stability | 2.78 | 2 | 0 | 16 |
+| Rotary Stability | 2.78 | 2 | 0 | 16 |
 
 ### Findings from this distribution that need attention
 
@@ -640,7 +640,7 @@ once the department signs the numbers off — that is when the distinction start
 
 4. **Left/right side pairing — UNDECIDED, and it affects the recording protocol, not just
    the code.** The clinical protocol scores Hurdle Step, Inline Lunge, Straight-Leg Raise
-   and Rotatory Stability on **each side** and records the lower. The system currently
+   and Rotary Stability on **each side** and records the lower. The system currently
    produces **one score per video from one frame**. Only Shoulder Mobility scores both
    sides (by top hand) and takes the worse. Implementing this needs either two videos per
    test or reliable side detection within one — so the department has to agree the

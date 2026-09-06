@@ -39,9 +39,10 @@ SAMPLE_PATTERN = re.compile(r"^sample[\s_-]*(\d+)$", re.IGNORECASE)
 # normalize_test_name() has already failed on the raw folder name, so canonical
 # names keep taking the normal path.
 #
-# The "rotatory" entry is now redundant - it is the department's official
-# spelling and a canonical alias, so normalize_test_name() resolves it first.
-# Kept because it costs nothing and still catches partial spellings.
+# The "rotatory" entry is now largely redundant: "rotatory stability" is itself
+# an alias, so normalize_test_name() resolves the full folder name first. It is
+# kept because it costs nothing and still catches partial spellings that the
+# alias would miss.
 NAME_REPAIRS = (
     ("rotatory", "rotary"),
     ("incline lunge", "inline lunge"),
