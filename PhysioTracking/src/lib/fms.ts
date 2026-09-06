@@ -1,6 +1,7 @@
 import {
   FmsCheck,
   FmsScoreBand,
+  FmsSideResult,
   FmsTestId,
   SessionSummary,
   StoredResult,
@@ -56,6 +57,20 @@ export function finalScoreFor(testId: FmsTestId, rawScore: number | null) {
   }
   return rawScore;
 }
+
+/**
+ * Tests whose two sides are now scored separately from one video.
+ *
+ * Hurdle step and inline lunge are deliberately absent: hurdle step alternates
+ * legs rep by rep rather than in two blocks, and inline lunge subjects were
+ * inconsistent about whether they swapped the lead foot or turned around. Both
+ * wait for separate left/right recordings from the department. Shoulder
+ * mobility needs nothing — it already scores each hand and reports the lower.
+ */
+export const SIDE_SPLIT_TESTS: ReadonlySet<FmsTestId> = new Set<FmsTestId>([
+  'active_straight_leg_raise',
+  'rotary_stability',
+]);
 
 export interface MeasurementSpec {
   key: string;
@@ -346,6 +361,8 @@ export interface ReportRow {
   bilateral: boolean;
   /** The screening this row is built from, or null when never screened. */
   screening: StoredResult | null;
+  /** Per-side results where the clip could be split, else null. */
+  sides: FmsSideResult[] | null;
   rawScore: number | null;
   /** null when pending side pairing, or when there is no screening at all. */
   finalScore: number | null;
@@ -374,16 +391,27 @@ export function buildReportRows(results: StoredResult[]): ReportRow[] {
     const screening = latest.get(testId) ?? null;
     const rawScore = screening?.result.score ?? null;
     const bilateral = BILATERAL_TESTS.has(testId);
+    // Where the video split into two sides, the clinical figure is the lower of
+    // them and the scorer has already worked it out. Otherwise a bilateral test
+    // stays pending: either it is one of the two awaiting separate recordings,
+    // or this particular clip had no detectable switch.
+    const sides = screening?.result.sides ?? null;
+    const splitFinal =
+      sides && typeof screening?.result.finalScore === 'number'
+        ? screening.result.finalScore
+        : null;
+
     return {
       testId,
       testName: screening?.result.testName ?? FMS_TEST_NAMES[testId],
       bilateral,
       screening,
       rawScore,
-      finalScore: screening ? finalScoreFor(testId, rawScore) : null,
-      // Only a screened bilateral test is *pending*; an unscreened one is
-      // simply absent, which the row shows as an em dash instead.
-      finalPending: bilateral && screening !== null,
+      sides,
+      finalScore: splitFinal ?? (screening ? finalScoreFor(testId, rawScore) : null),
+      // Only a screened bilateral test with no usable split is *pending*; an
+      // unscreened one is simply absent, shown as an em dash instead.
+      finalPending: bilateral && screening !== null && splitFinal === null,
     };
   });
 }

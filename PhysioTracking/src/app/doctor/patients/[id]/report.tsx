@@ -8,6 +8,7 @@ import { useAuth } from '@/context/auth-context';
 import { fetchPatientResults, fetchThresholds } from '@/lib/api';
 import {
   ReportRow,
+  SIDE_SPLIT_TESTS,
   buildMeasurementRows,
   buildPendingRows,
   buildReportRows,
@@ -220,7 +221,10 @@ function ReportRowView({
                 {row.finalScore}
                 <Text style={styles.scoreMax}>/3</Text>
               </Text>
-              <Text style={styles.equalsRaw}>= raw</Text>
+              {/* Where the clip was split the final is the lower side, which
+                  can differ from the whole-clip raw score — so it must not
+                  claim to equal it. */}
+              <Text style={styles.equalsRaw}>{row.sides ? 'lower side' : '= raw'}</Text>
             </>
           )}
         </View>
@@ -237,6 +241,39 @@ function ReportRowView({
             </Text>
           ) : (
             <>
+              {row.sides ? (
+                <>
+                  <Text style={styles.detailLabel}>
+                    Sides · scored separately
+                  </Text>
+                  <View style={styles.sideRow}>
+                    {row.sides.map((side) => {
+                      const lowest =
+                        typeof side.score === 'number' && side.score === row.finalScore;
+                      return (
+                        <View
+                          key={side.position}
+                          style={[styles.sideCard, lowest && styles.sideCardTaken]}>
+                          <Text style={styles.sideLabel}>{sideLabel(side.label)}</Text>
+                          <Text
+                            style={[styles.sideScore, { color: scoreColor(side.score) }]}>
+                            {side.score ?? '—'}
+                            <Text style={styles.sideMax}>/3</Text>
+                          </Text>
+                          <Text style={styles.sideMeta}>{side.frameCount} frames</Text>
+                          {lowest ? <Text style={styles.sideTaken}>taken as final</Text> : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.sideNote}>
+                    The clip was split at the detected side switch and each half scored on
+                    its own. The lower of the two is the final score, as the clinical
+                    protocol requires.
+                  </Text>
+                </>
+              ) : null}
+
               <Text style={styles.detailLabel}>Measurements &amp; thresholds</Text>
               {measurementRows.map((measurement) => (
                 <View key={measurement.key} style={styles.measurement}>
@@ -310,10 +347,11 @@ function ReportRowView({
                 </>
               ) : null}
 
-              {row.bilateral ? (
+              {row.finalPending ? (
                 <Text style={styles.pendingNote}>
-                  Final score pending: this movement is scored on each side clinically and
-                  the lower is recorded. Side pairing is not implemented yet.
+                  {SIDE_SPLIT_TESTS.has(row.testId)
+                    ? 'Final score pending: no side switch could be detected in this clip, so the two sides could not be scored separately.'
+                    : 'Final score pending: this movement is scored on each side clinically and the lower is recorded. Awaiting separate left/right recordings.'}
                 </Text>
               ) : null}
             </>
@@ -322,6 +360,14 @@ function ReportRowView({
       ) : null}
     </View>
   );
+}
+
+/** 'left' -> 'Left leg'; 'first'/'second' -> 'First half' where no limb is named. */
+function sideLabel(label: string) {
+  if (label === 'left' || label === 'right') {
+    return `${label.charAt(0).toUpperCase()}${label.slice(1)} leg`;
+  }
+  return label === 'first' ? 'First half' : 'Second half';
 }
 
 const CHIP_STYLES = {
@@ -485,6 +531,26 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     overflow: 'hidden',
   },
+  sideRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  sideCard: {
+    flex: 1,
+    backgroundColor: '#f6f8fa',
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#e6ecf1',
+    paddingVertical: 9,
+    paddingHorizontal: 11,
+    gap: 1,
+  },
+  // The side that became the final score is outlined, so the "lower of the two"
+  // rule is visible rather than something the reader has to work out.
+  sideCardTaken: { borderColor: '#10b7aa', backgroundColor: '#f0fbfa' },
+  sideLabel: { fontSize: 12, fontWeight: '700', color: '#64748b' },
+  sideScore: { fontSize: 22, fontWeight: '800', lineHeight: 26 },
+  sideMax: { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
+  sideMeta: { fontSize: 11, color: '#94a3b8' },
+  sideTaken: { fontSize: 10, fontWeight: '700', color: '#0f9f95', marginTop: 2 },
+  sideNote: { fontSize: 11.5, color: '#8494a4', lineHeight: 16, marginTop: 6 },
   notMeasured: {
     fontSize: 12.5,
     fontWeight: '600',

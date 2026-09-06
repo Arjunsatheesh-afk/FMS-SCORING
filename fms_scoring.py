@@ -336,6 +336,169 @@ def checks_for(test_id: str) -> tuple[Check, ...]:
     return THRESHOLDS.get(test_id, ())
 
 
+# --------------------------------------------------------------------------
+# Left/right side splitting
+#
+# Both sides of a bilateral test live in ONE video - every exercise folder in
+# the reference set holds exactly one file - so scoring each side means finding
+# where the subject switched, not matching up two clips.
+#
+# Only these two tests are split. Hurdle step alternates legs rep by rep rather
+# than in two blocks, and inline lunge subjects were inconsistent (some swapped
+# the lead foot in place, others turned around), so both wait for separate
+# left/right recordings. Shoulder mobility already scores each side.
+# --------------------------------------------------------------------------
+
+SIDE_SPLIT_TESTS = ("active_straight_leg_raise", "rotary_stability")
+
+_SPLIT_SMOOTH = 15      # median filter width, frames
+_SPLIT_DEADBAND = 0.12  # |signal| below this is ambiguous, so it votes for neither side
+_SPLIT_MIN_BLOCK = 0.10 # a phase must cover this share of the clip to count
+_SPLIT_MIN_CONF = 0.25  # a signal confident on less than this is unusable
+_SPLIT_MIN_FRAMES = 5   # the scorer's own minimum for a scoreable attempt
+
+
+def _aslr_side_signal(frame: FMSFrame) -> float | None:
+    """Which hip is more flexed. Positive means the LEFT leg is raised.
+
+    Uses the two hip angles the pipeline already computes on every frame, so
+    this adds no new geometry.
+    """
+    left = frame.angles.get("left_hip_angle")
+    right = frame.angles.get("right_hip_angle")
+    if left is None or right is None:
+        return None
+    return (float(right) - float(left)) / 90.0
+
+
+def _facing_signal_nose(frame: FMSFrame) -> float | None:
+    """Where the head points relative to the pelvis - i.e. which way the body faces.
+
+    On hands and knees viewed from the side, the two shoulders sit almost on top
+    of one another, so a left/right shoulder comparison is nearly noise. The nose
+    lies far along the facing axis, which makes this the strong signal for rotary
+    stability: confident on essentially every frame of 16 of the 18 reference
+    videos, against as little as 5% for the shoulder version.
+    """
+    hip_mid = _midpoint(frame, "left_hip", "right_hip")
+    nose = _point(frame, "nose")
+    torso = _torso_length(frame)
+    if hip_mid is None or nose is None or torso is None:
+        return None
+    return float(nose[0] - hip_mid[0]) / torso
+
+
+def _facing_signal_shoulders(frame: FMSFrame) -> float | None:
+    """Fallback facing signal for the clips where the nose is not tracked."""
+    left = _point(frame, "left_shoulder")
+    right = _point(frame, "right_shoulder")
+    torso = _torso_length(frame)
+    if left is None or right is None or torso is None:
+        return None
+    return float(left[0] - right[0]) / torso
+
+
+def _median_filter(values: list[float | None], width: int) -> list[float | None]:
+    half = width // 2
+    smoothed: list[float | None] = []
+    for index in range(len(values)):
+        window = [v for v in values[max(0, index - half) : index + half + 1] if v is not None]
+        smoothed.append(float(np.median(window)) if window else None)
+    return smoothed
+
+
+def _confident_fraction(series: list[float | None]) -> float:
+    if not series:
+        return 0.0
+    confident = sum(1 for v in series if v is not None and abs(v) >= _SPLIT_DEADBAND)
+    return confident / len(series)
+
+
+def _dominant_split(series: list[float | None]) -> int | None:
+    """Index where the signal changes sign between its two dominant phases.
+
+    Returns None unless the clip really is two blocks: exactly two phases long
+    enough to matter, in opposite directions.
+    """
+    confident = [
+        (index, 1 if value > 0 else -1)
+        for index, value in enumerate(series)
+        if value is not None and abs(value) >= _SPLIT_DEADBAND
+    ]
+    if len(confident) < 2 * _SPLIT_MIN_FRAMES:
+        return None
+
+    spans: list[tuple[int, int, int]] = []  # sign, first index, last index
+    sign, start, last = confident[0][1], confident[0][0], confident[0][0]
+    for index, value in confident[1:]:
+        if value != sign:
+            spans.append((sign, start, last))
+            sign, start = value, index
+        last = index
+    spans.append((sign, start, last))
+
+    minimum = _SPLIT_MIN_BLOCK * len(series)
+    big = [span for span in spans if (span[2] - span[1] + 1) >= minimum]
+    if len(big) != 2 or big[0][0] == big[1][0]:
+        return None
+    # Cut midway through the gap between the two phases.
+    return (big[0][2] + big[1][1]) // 2
+
+
+def dominant_side_label(test_id: str, segment: list[FMSFrame]) -> str | None:
+    """Which side a segment belongs to, from the majority of its frames.
+
+    Deliberately NOT read from the segment's scored frame. That frame is the
+    single most extreme one, and it can disagree with the side the segment is
+    actually about - in one reference clip the deepest frame of a right-leg
+    segment has the left hip more flexed, mid-changeover. A majority vote over
+    every confident frame is stable where a single frame is not.
+
+    Only meaningful for the straight-leg raise, whose signal names an anatomical
+    leg. Rotary stability's signal is a facing reversal, which does not identify
+    a limb, so it returns None and the caller falls back to first/second.
+    """
+    if test_id != "active_straight_leg_raise":
+        return None
+    series = _median_filter([_aslr_side_signal(frame) for frame in segment], _SPLIT_SMOOTH)
+    confident = [value for value in series if value is not None and abs(value) >= _SPLIT_DEADBAND]
+    if not confident:
+        return None
+    left = sum(1 for value in confident if value > 0)
+    return "left" if left * 2 >= len(confident) else "right"
+
+
+def split_sides(test_id: str, frames: list[FMSFrame]) -> tuple[list[FMSFrame], list[FMSFrame]] | None:
+    """Split one attempt into its two sides, or None when no clean switch exists.
+
+    None is a normal outcome, not a failure: five of the eighteen reference
+    rotary clips never show the subject turn round, and a clip containing only
+    one side must not be forced into two.
+    """
+    if test_id not in SIDE_SPLIT_TESTS or len(frames) < 2 * _SPLIT_MIN_FRAMES:
+        return None
+
+    if test_id == "active_straight_leg_raise":
+        candidates = [[_aslr_side_signal(frame) for frame in frames]]
+    else:
+        candidates = [
+            [_facing_signal_nose(frame) for frame in frames],
+            [_facing_signal_shoulders(frame) for frame in frames],
+        ]
+
+    for raw in candidates:
+        series = _median_filter(raw, _SPLIT_SMOOTH)
+        if _confident_fraction(series) < _SPLIT_MIN_CONF:
+            continue
+        cut = _dominant_split(series)
+        if cut is None:
+            continue
+        first, second = frames[:cut], frames[cut:]
+        if len(first) >= _SPLIT_MIN_FRAMES and len(second) >= _SPLIT_MIN_FRAMES:
+            return first, second
+    return None
+
+
 def _fires(test_id: str, fault: str, values: dict[str, float | None]) -> bool:
     """True when any declared check for this fault is breached.
 
@@ -529,7 +692,57 @@ class FMSScorer:
             )
         else:
             result = method(usable)
+
+        # Per-side scoring is ADDITIVE. `score` stays the whole-clip figure it
+        # has always been, so stored results and the validated baseline keep
+        # their meaning; the per-side breakdown and the clinical final score
+        # arrive alongside it in `sides` and `finalScore`.
+        sides = self._score_each_side(test_id, usable, method)
+        if sides is not None:
+            result = result | sides
+
         return base | result | {"status": "scored"}
+
+    def _score_each_side(
+        self,
+        test_id: str,
+        frames: list[FMSFrame],
+        method: Any,
+    ) -> dict[str, Any] | None:
+        """Score both sides of a split test, taking the lower as the final score.
+
+        The clinical protocol scores each side and records the worse of the two,
+        so `finalScore` is a minimum, not an average. Returns None when the clip
+        cannot be split, which leaves the report showing "pending" as before.
+        """
+        segments = split_sides(test_id, frames)
+        if segments is None:
+            return None
+
+        sides = []
+        for position, segment in zip(("first", "second"), segments):
+            scored = method(segment)
+            measurements = scored.get("measurements") or {}
+            sides.append(
+                {
+                    # From the segment's dominant signal, not its scored frame -
+                    # see dominant_side_label. Rotary has no anatomical side to
+                    # name, so it falls back to first/second.
+                    "label": dominant_side_label(test_id, segment) or position,
+                    "position": position,
+                    "score": scored.get("score"),
+                    "faults": scored.get("faults", []),
+                    "measurements": measurements,
+                    "frameCount": len(segment),
+                    "frameRange": [segment[0].frame, segment[-1].frame],
+                }
+            )
+
+        scores = [side["score"] for side in sides if isinstance(side["score"], int)]
+        return {
+            "sides": sides,
+            "finalScore": min(scores) if len(scores) == len(sides) else None,
+        }
 
     def _score_deep_squat(self, frames: list[FMSFrame]) -> dict[str, Any]:
         frame = min(frames, key=lambda item: _avg_angle(item, ["left_knee_angle", "right_knee_angle"], 180))

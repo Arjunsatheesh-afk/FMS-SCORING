@@ -102,6 +102,18 @@ export interface AnnotatedVideo {
   sizeBytes: number;
 }
 
+/** One side of a bilateral test, scored on its own segment of the video. */
+export interface FmsSideResult {
+  /** 'left'/'right' where the signal names a limb, else 'first'/'second'. */
+  label: string;
+  position: 'first' | 'second';
+  score: number | null;
+  faults: string[];
+  measurements: FmsMeasurements;
+  frameCount: number;
+  frameRange: [number, number];
+}
+
 export interface AnalysisResult {
   test: FmsTestId;
   testName: string;
@@ -120,6 +132,14 @@ export interface AnalysisResult {
   detectorMode: string;
   detectorDevice: string;
   video: VideoMetadata;
+  /**
+   * Present only where the video could be split into two sides — currently
+   * ASLR and rotary stability. `score` above stays the whole-clip figure; these
+   * are additive.
+   */
+  sides?: FmsSideResult[];
+  /** The lower of the two side scores — the clinical figure. */
+  finalScore?: number | null;
   /** Absent when the overlay render failed or was not attempted. */
   annotatedVideo?: AnnotatedVideo;
   annotatedVideoError?: string;

@@ -297,6 +297,69 @@ class ThresholdDeclarationTests(unittest.TestCase):
         self.assertEqual([band["score"] for band in shoulder["scoreBands"]], [3, 2, 1])
 
 
+def aslr_frames(left_raised_count, right_raised_count):
+    """Frames whose hip angles say which leg is up, for split detection.
+
+    split_sides reads only the precomputed hip angles for this test, so the
+    keypoints can stay at their defaults.
+    """
+    frames = []
+    for index in range(left_raised_count + right_raised_count):
+        left_up = index < left_raised_count
+        frame = make_frame(frame=index)
+        frame.angles["left_hip_angle"] = 95.0 if left_up else 175.0
+        frame.angles["right_hip_angle"] = 175.0 if left_up else 95.0
+        frames.append(frame)
+    return frames
+
+
+class SideSplitTests(unittest.TestCase):
+    """Splitting one clip into its two sides.
+
+    Both sides of a bilateral test live in a single video, so the switch has to
+    be found rather than looked up.
+    """
+
+    def test_only_the_two_confirmed_tests_split(self):
+        self.assertEqual(
+            set(fms_scoring.SIDE_SPLIT_TESTS),
+            {"active_straight_leg_raise", "rotary_stability"},
+            "hurdle step and inline lunge wait for separate left/right recordings",
+        )
+        for test_id in ("hurdle_step", "inline_lunge", "deep_squat", "shoulder_mobility"):
+            with self.subTest(test=test_id):
+                self.assertIsNone(fms_scoring.split_sides(test_id, aslr_frames(60, 60)))
+
+    def test_split_finds_the_changeover(self):
+        first, second = fms_scoring.split_sides("active_straight_leg_raise", aslr_frames(60, 60))
+        self.assertGreater(len(first), 5)
+        self.assertGreater(len(second), 5)
+        self.assertEqual(len(first) + len(second), 120)
+        # Within a few frames of the true changeover, allowing for smoothing.
+        self.assertLess(abs(len(first) - 60), 10)
+
+    def test_side_labels_come_from_the_dominant_signal(self):
+        first, second = fms_scoring.split_sides("active_straight_leg_raise", aslr_frames(60, 60))
+        self.assertEqual(fms_scoring.dominant_side_label("active_straight_leg_raise", first), "left")
+        self.assertEqual(fms_scoring.dominant_side_label("active_straight_leg_raise", second), "right")
+        # Rotary's signal is a facing reversal and names no limb.
+        self.assertIsNone(fms_scoring.dominant_side_label("rotary_stability", first))
+
+    def test_single_sided_clip_is_not_split(self):
+        """A clip with no changeover must stay whole, not be halved arbitrarily."""
+        self.assertIsNone(fms_scoring.split_sides("active_straight_leg_raise", aslr_frames(120, 0)))
+
+    def test_final_score_is_the_lower_side(self):
+        result = FMSScorer().score("active_straight_leg_raise", aslr_frames(60, 60))
+        self.assertIn("sides", result)
+        self.assertEqual(len(result["sides"]), 2)
+        scores = [side["score"] for side in result["sides"]]
+        self.assertEqual(result["finalScore"], min(scores))
+        # The whole-clip score is untouched by splitting - the per-side figures
+        # are additive, which is what keeps the validated baseline meaningful.
+        self.assertIsInstance(result["score"], int)
+
+
 class ThresholdBehaviourTests(unittest.TestCase):
     """The declared numbers are the ones the scorer really applies."""
 

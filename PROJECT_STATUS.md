@@ -91,7 +91,7 @@ auth_store.py             SQLite: users, tokens, results. All SQL is here.
 annotate_video.py         Skeleton-overlay renderer (reads cached keypoints, no detector).
 run_all_samples.py        Batch runner over the Dataset/ folder tree.
 seed_accounts.py          Creates the doctor + demo patients.
-test_fms_scoring.py       13 tests, seven of which guard the threshold table
+test_fms_scoring.py       18 tests, covering the threshold table and side splitting
                           against the scoring code. See section 13.
 
 analysis/                 Five throwaway-but-kept analysis scripts from the camera-angle
@@ -610,6 +610,39 @@ Deep Squat and Hurdle Step gained a pending section they did not have. Their ank
 carry **two** blockers, both named in the reason text: the tracking upgrade *and* a side
 view, since both tests are filmed frontally.
 
+### Side splitting for ASLR and Rotary Stability (added 6 Sep 2026)
+
+Both sides of a bilateral test live in one video, so scoring each side means finding the
+switch. `split_sides()` computes a per-frame signal whose **sign** names the active side,
+median-filters it over 15 frames, and cuts between the two dominant phases. Each half is
+then scored by the **existing** `_score_*` method, and the **lower** of the two becomes
+`finalScore`, as the clinical protocol requires.
+
+| Test | Signal | Splits |
+|---|---|---|
+| Active Straight-Leg Raise | difference between the two hip angles — already computed every frame | 15 / 18 |
+| Rotary Stability | nose position relative to the pelvis midline | 13 / 18 |
+
+**Rotary's signal choice matters.** On hands and knees seen from the side, the two
+shoulders sit almost on top of each other, so a left/right shoulder comparison is confident
+on as little as 5% of frames. The nose lies along the facing axis and is confident on
+essentially every frame of 16 of 18 clips. A shoulder-order fallback covers the two videos
+where the nose is not tracked (Sample 7 at 0%, Sample 8 at 3%).
+
+**Not splitting is a normal outcome**, not a failure: 3 ASLR clips have no detectable
+switch and 5 rotary subjects never turn on camera. Those rows stay *Pending* with a reason,
+rather than being halved arbitrarily.
+
+**Side labels come from the segment's dominant signal, not its scored frame.** The scored
+frame is the single most extreme one and can disagree — in 7 of 15 ASLR splits the deepest
+frame of a right-leg segment has the *left* hip more flexed, mid-changeover. A majority
+vote over the segment is stable where one frame is not; using the scored frame gave both
+halves the same label on 7 clips.
+
+**Splitting is purely additive.** `score` stays the whole-clip figure it has always been;
+`sides` and `finalScore` arrive alongside it. Re-scoring all 126 videos confirmed the split
+moved **nothing** — the only difference from the baseline remains the ASLR hip check below.
+
 ### ASLR: resting-leg hip flexion is now a real check
 
 The one pending item that was measurable today — sagittal view, both hip angles already
@@ -678,13 +711,18 @@ once the department signs the numbers off — that is when the distinction start
 
 ### Pending decisions
 
-4. **Left/right side pairing — UNDECIDED, and it affects the recording protocol, not just
-   the code.** The clinical protocol scores Hurdle Step, Inline Lunge, Straight-Leg Raise
-   and Rotary Stability on **each side** and records the lower. The system currently
-   produces **one score per video from one frame**. Only Shoulder Mobility scores both
-   sides (by top hand) and takes the worse. Implementing this needs either two videos per
-   test or reliable side detection within one — so the department has to agree the
-   protocol before the code changes. **Do not start this without that decision.**
+4. **Left/right side pairing — done for three of five, blocked on recordings for two.**
+
+   | Test | State |
+   |---|---|
+   | Shoulder Mobility | **Already correct.** Scores each hand and reports the lower — verified 18/18 against the reference set. Needed no change. |
+   | Active Straight-Leg Raise | **Split implemented.** Splits 15/18; the other 3 have no detectable switch and stay pending. |
+   | Rotary Stability | **Split implemented.** Splits 13/18; 5 never turn on camera and stay pending. |
+   | Hurdle Step | **Blocked.** Alternates legs rep by rep rather than in two blocks, so there is no single switch to find — it needs per-repetition segmentation. Department asked for separate left/right files. |
+   | Inline Lunge | **Blocked.** Subjects were inconsistent: 7 swapped the lead foot in place, 9 turned around, 2 did neither. Department asked for separate left/right files. |
+
+   See section 12 for how the split works. Every exercise folder holds exactly one video
+   (126 folders, 126 files), so this is segmentation, never file-matching.
 
 5. **UI pass — done for the doctor's roster and patient screens (5 Sep 2026).**
    Roster: doctor's name moved above the title, phone number dropped from rows in favour
@@ -716,7 +754,7 @@ once the department signs the numbers off — that is when the distinction start
    `requirements-win.txt` is unfinished work.
 
 9. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
-   **13 tests** with the threshold work (section 12), which now guards the declared
+   **18 tests** with the threshold and side-splitting work (section 12), which now guard the declared
    thresholds against the scoring code and asserts that pending checks can never be
    evaluated. Still missing: per-fault behavioural coverage for
    the other six tests — only the deep squat's depth fault is exercised end to end — and
