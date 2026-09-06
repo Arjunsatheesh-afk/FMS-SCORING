@@ -9,6 +9,7 @@ import { fetchPatientResults, fetchThresholds } from '@/lib/api';
 import {
   ReportRow,
   buildMeasurementRows,
+  buildPendingRows,
   buildReportRows,
   formatFault,
   rawSubtotal,
@@ -168,12 +169,13 @@ function ReportRowView({
   onToggle: () => void;
 }) {
   const screening = row.screening;
-  const notAssessed = Array.isArray(screening?.result.measurements?.notAssessed)
-    ? (screening?.result.measurements.notAssessed as string[])
-    : [];
   const measurementRows = screening
     ? buildMeasurementRows(row.testId, screening.result.measurements, thresholds)
     : [];
+  // Driven by the served spec rather than the stored notAssessed array: the
+  // spec is complete (it also covers the joints never measured at all) and it
+  // carries the department's target and the reason for each gap.
+  const pendingRows = buildPendingRows(thresholds?.checks ?? []);
 
   return (
     <View style={styles.row}>
@@ -282,16 +284,29 @@ function ReportRowView({
                 </View>
               )}
 
-              {notAssessed.length > 0 ? (
+              {pendingRows.length > 0 ? (
                 <>
-                  <Text style={styles.detailLabel}>Not assessed from this view</Text>
-                  <View style={styles.chipWrap}>
-                    {notAssessed.map((item) => (
-                      <Text key={item} style={styles.naChip}>
-                        {formatFault(item)}
-                      </Text>
-                    ))}
-                  </View>
+                  <Text style={styles.detailLabel}>
+                    Not yet assessed · {pendingRows.length}
+                  </Text>
+                  {pendingRows.map((item) => (
+                    <View key={item.key} style={styles.measurement}>
+                      <View style={styles.measurementTop}>
+                        <Text style={[styles.measurementKey, styles.measurementKeyMuted]}>
+                          {item.label}
+                        </Text>
+                        {/* Occupies the slot a reading would, but can never be
+                            mistaken for one. No value is invented. */}
+                        <Text style={styles.notMeasured}>not measured</Text>
+                      </View>
+                      <View style={styles.chipRow}>
+                        <Text style={item.target ? styles.targetChip : styles.noTargetChip}>
+                          {item.target ? `target ${item.target}` : 'no target provided'}
+                        </Text>
+                        <Text style={styles.reasonChip}>{item.reason}</Text>
+                      </View>
+                    </View>
+                  ))}
                 </>
               ) : null}
 
@@ -470,14 +485,48 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     overflow: 'hidden',
   },
-  naChip: {
-    fontSize: 12,
+  notMeasured: {
+    fontSize: 12.5,
     fontWeight: '600',
+    fontStyle: 'italic',
+    color: '#94a3b8',
+  },
+  // Dashed, so a target never reads as a measurement. The ✓/✗ threshold chips
+  // above are solid and always sit beside a real value.
+  targetChip: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#7a5c12',
+    backgroundColor: '#fdf7e6',
+    borderWidth: 1,
+    borderColor: '#ddc98b',
+    borderStyle: 'dashed',
+    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
+  noTargetChip: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#6b7785',
+    backgroundColor: '#eef2f6',
+    borderWidth: 1,
+    borderColor: '#c6cfd8',
+    borderStyle: 'dashed',
+    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
+  reasonChip: {
+    fontSize: 11.5,
+    fontWeight: '500',
     color: '#64748b',
     backgroundColor: '#eef2f6',
-    borderRadius: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    borderRadius: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     overflow: 'hidden',
   },
   noFaults: { fontSize: 14, color: '#64748b' },

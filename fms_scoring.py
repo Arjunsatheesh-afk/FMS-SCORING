@@ -125,8 +125,25 @@ class Check:
     fault: str | None = None
     rule: str | None = None
 
+    # A pending check is one the FMS defines but this system does not measure
+    # yet - a camera-angle casualty, or a joint the pose model cannot see. It is
+    # never evaluated: it carries the department's target and the reason it is
+    # outstanding, so the report can show an explained gap rather than a blank.
+    # `target_min`/`target_max` are the department's window in THEIR convention
+    # (flexion, dorsiflexion), which is safe to display verbatim precisely
+    # because there is no measured value to compare it against.
+    pending: bool = False
+    target_min: float | None = None
+    target_max: float | None = None
+    target_unit: str | None = None
+    # For a target that is not a number, e.g. "heel remains in contact".
+    target_text: str | None = None
+    reason: str | None = None
+
     @property
     def kind(self) -> str:
+        if self.pending:
+            return "pending"
         return "fault" if self.fault is not None else "completion"
 
     def fails(self, measured: float | None) -> bool:
@@ -162,6 +179,22 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
         ),
         Check("complete_knee", "completion", "kneeAngle", "gt", 140.0, "°"),
         Check("complete_hip", "completion", "hipAngle", "gt", 145.0, "°"),
+        Check(
+            "ankle_dorsiflexion",
+            "ankle dorsiflexion",
+            pending=True,
+            target_min=15.0,
+            target_max=30.0,
+            target_unit="° DF",
+            reason="needs ankle tracking and side-view footage — this test is filmed frontally",
+        ),
+        Check(
+            "heel_on_floor",
+            "heel stays on floor",
+            pending=True,
+            target_text="heel remains in contact",
+            reason="needs a heel landmark and a floor reference",
+        ),
     ),
     "hurdle_step": (
         Check("clearance", "clearance", "stepHeightNorm", "lt", 0.16, "leg", "insufficient_step_clearance"),
@@ -177,11 +210,65 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
             ),
         ),
         Check("complete_step", "completion", "stepHeightNorm", "lt", 0.10, "leg"),
+        Check(
+            "stepping_ankle_dorsiflexion",
+            "stepping-leg ankle dorsiflexion",
+            pending=True,
+            target_min=0.0,
+            target_max=15.0,
+            target_unit="° DF",
+            reason=(
+                "needs ankle tracking and side-view footage (filmed frontally), "
+                "plus leg-role detection"
+            ),
+        ),
+        Check(
+            "stance_ankle_dorsiflexion",
+            "stance-leg ankle dorsiflexion",
+            pending=True,
+            target_min=10.0,
+            target_max=20.0,
+            target_unit="° DF",
+            reason=(
+                "needs ankle tracking and side-view footage (filmed frontally), "
+                "plus leg-role detection"
+            ),
+        ),
     ),
     "inline_lunge": (
         Check("knee_flexion", "descent", "kneeAngle", "gt", 125.0, "°", "insufficient_knee_flexion"),
         Check("trunk_lean", "trunk lean", "trunkLeanDeg", "gt", 28.0, "°", "forward_trunk_lean"),
         Check("complete_knee", "completion", "kneeAngle", "gt", 145.0, "°"),
+        Check(
+            "knee_alignment_compensation",
+            "knee alignment compensation",
+            pending=True,
+            reason="needs front-view footage — this is frontal-plane motion",
+        ),
+        Check(
+            "balance_or_pelvis_shift",
+            "balance / pelvic shift",
+            pending=True,
+            reason="needs front-view footage — this is frontal-plane motion",
+        ),
+        Check(
+            "lead_ankle_dorsiflexion",
+            "lead-leg ankle dorsiflexion",
+            pending=True,
+            target_min=10.0,
+            target_max=20.0,
+            target_unit="° DF",
+            reason="needs ankle tracking, plus lead/trailing leg detection",
+        ),
+        Check(
+            "trailing_ankle_plantarflexion",
+            "trailing-leg ankle plantarflexion",
+            pending=True,
+            target_min=15.0,
+            target_max=30.0,
+            target_unit="° PF",
+            reason="needs ankle tracking and a dorsi/plantar sign, plus leg detection",
+        ),
     ),
     # Score bands, not cutoffs - see SHOULDER_SCORE_* above and threshold_spec().
     "shoulder_mobility": (),
@@ -189,7 +276,36 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
         Check("leg_raise", "range", "raisedHipAngle", "gt", 110.0, "°", "insufficient_leg_raise"),
         Check("raised_knee", "raised knee", "raisedKneeAngle", "lt", 155.0, "°", "same_side_knee_flexion"),
         Check("opposite_knee", "opposite knee", "oppositeKneeAngle", "lt", 160.0, "°", "opposite_side_knee_flexion"),
+        # The department's target is 0-10 degrees of flexion on the resting leg,
+        # which is an included angle of 170-180. This is the one check taken
+        # directly from their data - every other threshold here predates their
+        # review and is still pending sign-off.
+        Check("opposite_hip", "opposite hip", "oppositeHipAngle", "lt", 170.0, "°", "opposite_side_hip_flexion"),
         Check("complete_hip", "completion", "raisedHipAngle", "gt", 135.0, "°"),
+        Check(
+            "raised_ankle_dorsiflexion",
+            "raised-leg ankle dorsiflexion",
+            pending=True,
+            target_min=0.0,
+            target_max=10.0,
+            target_unit="° DF",
+            reason="needs ankle tracking upgrade",
+        ),
+        Check(
+            "down_ankle_dorsiflexion",
+            "down-leg ankle",
+            pending=True,
+            target_min=0.0,
+            target_max=10.0,
+            target_unit="° DF / neutral",
+            reason="needs ankle tracking upgrade",
+        ),
+        Check(
+            "pelvis_lift_or_rotation",
+            "pelvis lift or rotation",
+            pending=True,
+            reason="needs front-view or 3D — the pelvis axis points at the camera",
+        ),
     ),
     "trunk_stability_pushup": (
         Check("pushup_range", "range", "elbowAngle", "gt", 135.0, "°", "insufficient_pushup_range"),
@@ -200,6 +316,18 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
     "rotary_stability": (
         Check("elbow_knee_touch", "touch", "elbowKneeDistanceNorm", "gt", 0.40, "limb", "fail_to_touch_elbow_to_knee"),
         Check("complete_touch", "completion", "elbowKneeDistanceNorm", "gt", 0.60, "limb"),
+        Check(
+            "shoulder_or_pelvis_rotation",
+            "shoulder or pelvis rotation",
+            pending=True,
+            reason="needs front-view footage — this is transverse-plane motion",
+        ),
+        Check(
+            "shoulder_lowering",
+            "shoulder lowering",
+            pending=True,
+            reason="needs front-view footage — this is transverse-plane motion",
+        ),
     ),
 }
 
@@ -217,16 +345,21 @@ def _fires(test_id: str, fault: str, values: dict[str, float | None]) -> bool:
     return any(
         check.fails(values.get(check.measurement))
         for check in checks_for(test_id)
-        if check.fault == fault and check.measurement is not None
+        if check.fault == fault and check.measurement is not None and not check.pending
     )
 
 
 def _incomplete(test_id: str, values: dict[str, float | None]) -> bool:
-    """True when any completion gate is breached, which scores 1."""
+    """True when any completion gate is breached, which scores 1.
+
+    Pending checks are excluded explicitly: they have no measurement, so a
+    movement must never be marked incomplete because a joint this system cannot
+    see yet went unmeasured.
+    """
     return any(
         check.fails(values.get(check.measurement))
         for check in checks_for(test_id)
-        if check.fault is None and check.measurement is not None
+        if check.fault is None and check.measurement is not None and not check.pending
     )
 
 
@@ -248,6 +381,11 @@ def threshold_spec() -> dict[str, Any]:
                     "fault": check.fault,
                     "kind": check.kind,
                     "rule": check.rule,
+                    "targetMin": check.target_min,
+                    "targetMax": check.target_max,
+                    "targetUnit": check.target_unit,
+                    "targetText": check.target_text,
+                    "reason": check.reason,
                 }
                 for check in checks_for(test_id)
             ],
@@ -625,14 +763,19 @@ class FMSScorer:
         raised_knee = _angle(frame, f"{raised_side}_knee_angle", 180)
         opposite = "right" if raised_side == "left" else "left"
         opposite_knee = _angle(frame, f"{opposite}_knee_angle", 180)
+        # The resting leg's hip. Both hip angles were already read above, so the
+        # non-raised one is simply the larger of the two - no new geometry.
+        opposite_hip = max(left_hip, right_hip)
 
         # pelvis_lift_or_rotation is dropped: the subject is supine and filmed
         # from the side, so the pelvis L-R axis points at the camera and
-        # obliquity cannot be separated from rotation. See notAssessed.
+        # obliquity cannot be separated from rotation. It is declared as a
+        # pending check so the report can explain the gap.
         values = {
             "raisedHipAngle": raised_hip,
             "raisedKneeAngle": raised_knee,
             "oppositeKneeAngle": opposite_knee,
+            "oppositeHipAngle": opposite_hip,
         }
 
         faults = []
@@ -642,6 +785,8 @@ class FMSScorer:
             faults.append("same_side_knee_flexion")
         if _fires("active_straight_leg_raise", "opposite_side_knee_flexion", values):
             faults.append("opposite_side_knee_flexion")
+        if _fires("active_straight_leg_raise", "opposite_side_hip_flexion", values):
+            faults.append("opposite_side_hip_flexion")
 
         complete = not _incomplete("active_straight_leg_raise", values)
         return _score_from_faults(
@@ -652,6 +797,7 @@ class FMSScorer:
                 "raisedHipAngle": round(raised_hip, 2),
                 "raisedKneeAngle": round(raised_knee, 2),
                 "oppositeKneeAngle": round(opposite_knee, 2),
+                "oppositeHipAngle": round(opposite_hip, 2),
                 "scoredFrame": frame.frame,
                 "notAssessed": ["pelvis_lift_or_rotation"],
             },

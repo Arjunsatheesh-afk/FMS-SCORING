@@ -198,6 +198,57 @@ class ThresholdDeclarationTests(unittest.TestCase):
                             "report and the scorer cannot disagree",
                         )
 
+    def test_pending_checks_are_never_evaluated(self):
+        """A pending check must not affect any score.
+
+        They carry a target and a reason for display only. If one ever leaked
+        into _fires() or _incomplete(), an unmeasured joint would start failing
+        movements - so this asserts the shape that makes that impossible.
+        """
+        pending = [
+            (test_id, check)
+            for test_id, checks in THRESHOLDS.items()
+            for check in checks
+            if check.pending
+        ]
+        self.assertTrue(pending, "expected pending checks to be declared")
+        for test_id, check in pending:
+            with self.subTest(test=test_id, check=check.key):
+                self.assertIsNone(check.measurement, "a pending check has nothing to measure")
+                self.assertIsNone(check.value, "a pending check has no threshold")
+                self.assertIsNone(check.fault, "a pending check cannot raise a fault")
+                self.assertEqual(check.kind, "pending")
+                self.assertFalse(check.fails(0.0))
+                self.assertIsNotNone(check.reason, "every pending check explains itself")
+                has_target = (
+                    check.target_min is not None
+                    or check.target_max is not None
+                    or check.target_text is not None
+                )
+                # Five of these have no department target, which is a fact about
+                # the data rather than an omission - so a target is optional,
+                # but a reason never is.
+                if has_target:
+                    self.assertIsNotNone(
+                        check.target_unit or check.target_text,
+                        "a numeric target needs a unit",
+                    )
+
+    def test_opposite_hip_check_matches_the_department_target(self):
+        """The resting leg's hip is the one threshold taken from their data.
+
+        Their target is 0-10 degrees of flexion, which in the included-angle
+        convention the scorer stores is 170-180.
+        """
+        check = next(
+            c for c in checks_for("active_straight_leg_raise") if c.key == "opposite_hip"
+        )
+        self.assertEqual(check.measurement, "oppositeHipAngle")
+        self.assertEqual(check.comparison, "lt")
+        self.assertEqual(180.0 - check.value, 10.0)
+        self.assertFalse(check.fails(175.0), "5 degrees of flexion is within target")
+        self.assertTrue(check.fails(160.0), "20 degrees of flexion is outside it")
+
     def test_check_boundary_is_exclusive(self):
         for test_id, checks in THRESHOLDS.items():
             for check in checks:
@@ -219,7 +270,12 @@ class ThresholdDeclarationTests(unittest.TestCase):
             "hurdle_step": {"kneeAngle", "hipAngle", "stepHeightNorm", "pelvisTiltNorm", "kneeOffsetAbs"},
             "inline_lunge": {"kneeAngle", "hipAngle", "trunkLeanDeg"},
             "shoulder_mobility": set(),
-            "active_straight_leg_raise": {"raisedHipAngle", "raisedKneeAngle", "oppositeKneeAngle"},
+            "active_straight_leg_raise": {
+                "raisedHipAngle",
+                "raisedKneeAngle",
+                "oppositeKneeAngle",
+                "oppositeHipAngle",
+            },
             "trunk_stability_pushup": {"elbowAngle", "kneeAngle", "bodyLineErrorNorm"},
             "rotary_stability": {"elbowKneeDistanceNorm"},
         }

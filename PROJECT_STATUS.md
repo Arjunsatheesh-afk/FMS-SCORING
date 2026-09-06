@@ -91,7 +91,7 @@ auth_store.py             SQLite: users, tokens, results. All SQL is here.
 annotate_video.py         Skeleton-overlay renderer (reads cached keypoints, no detector).
 run_all_samples.py        Batch runner over the Dataset/ folder tree.
 seed_accounts.py          Creates the doctor + demo patients.
-test_fms_scoring.py       11 tests, five of which guard the threshold table
+test_fms_scoring.py       13 tests, seven of which guard the threshold table
                           against the scoring code. See section 13.
 
 analysis/                 Five throwaway-but-kept analysis scripts from the camera-angle
@@ -583,6 +583,46 @@ tests. Two more assert the declared numbers are the ones actually applied.
 diffed against `all_samples_report.json`: **0 score changes, 0 fault changes, 0 measurement
 changes**, 126/126 matched.
 
+### Pending checks shown as targets (added 6 Sep 2026)
+
+The Report tab's "Not assessed" grey chips are replaced by a **"Not yet assessed"** section
+where each gap carries the department's target and the reason it is outstanding. The value
+slot reads *"not measured"* in italic grey — it occupies the position a reading would, so
+rows scan together, but **no value is ever invented**. Targets use a dashed amber chip;
+measurements stay solid, so a goal never reads as a result.
+
+**13 pending checks** are declared as `Check(pending=True, ...)` in `THRESHOLDS` and served
+through `/fms/thresholds`. They are never evaluated — `_fires()` and `_incomplete()` skip
+them explicitly, so an unmeasured joint can never fail a movement, and a test asserts that
+shape.
+
+| Reason | Count | Examples |
+|---|---|---|
+| Needs front-view footage | 5 | knee alignment, balance/pelvic shift, pelvis lift, shoulder rotation, shoulder lowering |
+| Needs ankle tracking upgrade | 8 | all seven ankle DF/PF targets, plus heel-on-floor |
+
+**Five of the 13 have no department target**, shown as *"no target provided"*. Their data
+is joint-angle ranges; those five are qualitative compensations they never gave a window
+for, and two sit on Rotary Stability, which their data does not cover at all. Inventing a
+range would be worse than a blank — a number on a clinical sheet reads as authoritative.
+
+Deep Squat and Hurdle Step gained a pending section they did not have. Their ankle targets
+carry **two** blockers, both named in the reason text: the tracking upgrade *and* a side
+view, since both tests are filmed frontally.
+
+### ASLR: resting-leg hip flexion is now a real check
+
+The one pending item that was measurable today — sagittal view, both hip angles already
+computed — was implemented rather than listed. `oppositeHipAngle` is now recorded and
+checked at `< 170°` included, which is the department's 0–10° flexion target converted.
+**It is the only threshold in the system taken from their data**; every other one predates
+their review.
+
+Impact, measured by re-scoring all 126 cached videos: **the other six movements changed by
+0** — no score, fault or measurement moved. ASLR fired the new fault on **11 of 18**, of
+which **3 dropped 3 → 2**; the other 8 already carried a fault and stayed at 2. ASLR's
+distribution goes from `2:10, 3:8` to `2:13, 3:5`.
+
 Thresholds are fetched **live**, so a historical screening is shown against today's
 numbers. Storing them per result at scoring time is the accurate answer and is worth doing
 once the department signs the numbers off — that is when the distinction starts to matter.
@@ -676,8 +716,9 @@ once the department signs the numbers off — that is when the distinction start
    `requirements-win.txt` is unfinished work.
 
 9. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
-   **11 tests** with the threshold work (section 12), which now guards the declared
-   thresholds against the scoring code. Still missing: per-fault behavioural coverage for
+   **13 tests** with the threshold work (section 12), which now guards the declared
+   thresholds against the scoring code and asserts that pending checks can never be
+   evaluated. Still missing: per-fault behavioural coverage for
    the other six tests — only the deep squat's depth fault is exercised end to end — and
    nothing at all covers `analysis_server.py` or `auth_store.py`, both of which have been
    verified only by driving a running server by hand.

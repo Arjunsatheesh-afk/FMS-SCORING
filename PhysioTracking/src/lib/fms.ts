@@ -106,6 +106,7 @@ export const MEASUREMENT_SPEC: Record<FmsTestId, MeasurementSpec[]> = {
     { key: 'raisedHipAngle', label: 'Raised hip angle', unit: '°', decimals: 1 },
     { key: 'raisedKneeAngle', label: 'Raised knee angle', unit: '°', decimals: 1 },
     { key: 'oppositeKneeAngle', label: 'Opposite knee angle', unit: '°', decimals: 1 },
+    { key: 'oppositeHipAngle', label: 'Opposite hip angle', unit: '°', decimals: 1 },
     { key: 'raisedSide', label: 'Raised side' },
   ],
   trunk_stability_pushup: [
@@ -282,7 +283,12 @@ export function buildMeasurementRows(
     });
   }
 
-  for (const check of checks.filter((item) => item.measurement === null)) {
+  // Valueless checks the scorer DOES evaluate, e.g. the deep squat's
+  // arms-overhead rule. Pending checks are excluded — they are not evaluated at
+  // all and get their own section, with a target and a reason.
+  for (const check of checks.filter(
+    (item) => item.measurement === null && item.kind !== 'pending',
+  )) {
     rows.push({
       key: check.key,
       label: check.label,
@@ -293,6 +299,45 @@ export function buildMeasurementRows(
   }
 
   return rows;
+}
+
+export interface PendingRow {
+  key: string;
+  label: string;
+  /** The department's target, or null where they supplied none. */
+  target: string | null;
+  reason: string;
+}
+
+/** '15–30° DF', 'heel remains in contact', or null when no target exists. */
+function formatTarget(check: FmsCheck) {
+  if (check.targetText) {
+    return check.targetText;
+  }
+  if (check.targetMin === null || check.targetMax === null) {
+    return null;
+  }
+  // Every declared unit begins with '°', so it butts against the number.
+  return `${check.targetMin}–${check.targetMax}${check.targetUnit ?? ''}`;
+}
+
+/**
+ * Checks this system does not measure yet, each with the department's target
+ * and why it is outstanding.
+ *
+ * A null target is not an omission: the department's data is joint-angle
+ * ranges, and the camera-angle casualties are qualitative compensations they
+ * never gave a window for. The report says so rather than inventing one.
+ */
+export function buildPendingRows(checks: FmsCheck[]): PendingRow[] {
+  return checks
+    .filter((check) => check.kind === 'pending')
+    .map((check) => ({
+      key: check.key,
+      label: check.label,
+      target: formatTarget(check),
+      reason: check.reason ?? '',
+    }));
 }
 
 export interface ReportRow {
@@ -389,6 +434,7 @@ export const FAULT_LABELS: Record<string, string> = {
   insufficient_leg_raise: 'Leg not raised far enough',
   same_side_knee_flexion: 'Raised knee bends',
   opposite_side_knee_flexion: 'Opposite knee bends',
+  opposite_side_hip_flexion: 'Resting leg lifts at the hip',
   pelvis_lift_or_rotation: 'Pelvis lifts or rotates',
   // Trunk stability push-up
   insufficient_pushup_range: 'Not enough push-up range',

@@ -36,8 +36,22 @@ export interface FmsCheck {
   value: number | null;
   unit: string | null;
   fault: string | null;
-  kind: 'fault' | 'completion';
+  /**
+   * 'pending' is a check the FMS defines but this system does not measure yet.
+   * It is never evaluated — it carries the department's target and the reason
+   * it is outstanding, so a report can show an explained gap rather than a
+   * blank. Its target is in the department's own convention (flexion,
+   * dorsiflexion), which is safe to display verbatim because there is no
+   * measured value to compare it against.
+   */
+  kind: 'fault' | 'completion' | 'pending';
   rule: string | null;
+  targetMin: number | null;
+  targetMax: number | null;
+  targetUnit: string | null;
+  /** A target that is not a number, e.g. "heel remains in contact". */
+  targetText: string | null;
+  reason: string | null;
 }
 
 /** Shoulder mobility maps a distance straight to a score, with no cutoffs. */
