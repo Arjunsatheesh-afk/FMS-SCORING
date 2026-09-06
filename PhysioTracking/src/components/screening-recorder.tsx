@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAnalysis } from '@/context/analysis-context';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, createAnalysisJob, fetchAnalysisJob, fetchExercises } from '@/lib/api';
-import { formatScore } from '@/lib/fms';
+import { BILATERAL_TESTS, formatScore } from '@/lib/fms';
 import { AnalysisJob, FmsExercise, FmsTestId, SessionSummary } from '@/types/analysis';
 
 const POLL_MS = 1500;
@@ -37,58 +37,106 @@ export default function ScreeningRecorder({
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back');
 
   const [exercises, setExercises] = useState<FmsExercise[]>([]);
-  const [selectedExercise, setSelectedExercise] = useState<FmsTestId>('deep_squat');
+  // Starts unselected on purpose. A default meant an upload could silently
+  // inherit the previous choice - which is how a hurdle step was once scored
+  // against deep squat rules, with nothing on screen to signal it.
+  const [selectedExercise, setSelectedExercise] = useState<FmsTestId | null>(null);
+  // null means "let the scorer detect the side".
+  const [selectedSide, setSelectedSide] = useState<'left' | 'right' | null>(null);
   const [job, setJob] = useState<AnalysisJob | null>(null);
+  // The job being polled. Polling lives in its own effect keyed on this, so no
+  // unrelated re-render can tear it down - previously the interval handle sat
+  // in a ref that the exercise-loading effect's cleanup cleared, so changing
+  // the picker mid-job killed progress updates and froze the bar.
+  const [pollingJobId, setPollingJobId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [recordedVideoUri, setRecordedVideoUri] = useState<string | null>(null);
 
   const cameraRef = useRef<CameraView>(null);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // No dependency on the current selection: the list does not change when the
+  // user picks a different test, so refetching on every tap was pure churn.
   const loadExercises = useCallback(async () => {
     try {
       const response = await fetchExercises();
       if (response.exercises.length > 0) {
         setExercises(response.exercises);
-        if (!response.exercises.some((exercise) => exercise.id === selectedExercise)) {
-          setSelectedExercise(response.exercises[0].id);
-        }
       }
     } catch (error) {
       setErrorMessage((error as Error).message);
     }
-  }, [selectedExercise]);
+  }, []);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      void loadExercises();
-    }, 0);
+    void loadExercises();
+  }, [loadExercises]);
+
+  useEffect(() => {
+    if (!pollingJobId) {
+      return;
+    }
+    let cancelled = false;
+    const timer = setInterval(async () => {
+      try {
+        const nextJob = await fetchAnalysisJob(pollingJobId);
+        if (cancelled) return;
+        setJob(nextJob);
+
+        if (nextJob.status === 'completed' && nextJob.result) {
+          setPollingJobId(null);
+          addSession({
+            id: nextJob.id,
+            createdAt: nextJob.updatedAt,
+            ...nextJob.result,
+          } as SessionSummary);
+          void refresh();
+          // Deliberately no navigation here. The finished job stays on screen
+          // with its score until the doctor chooses to move on; navigating
+          // away automatically is what made a completed job look stuck.
+        }
+
+        if (nextJob.status === 'failed') {
+          setPollingJobId(null);
+          setErrorMessage(nextJob.error?.message ?? 'Analysis failed');
+        }
+      } catch (error) {
+        if (!cancelled) setErrorMessage((error as Error).message);
+      }
+    }, POLL_MS);
 
     return () => {
-      clearTimeout(timeoutId);
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
+      cancelled = true;
+      clearInterval(timer);
     };
-  }, [loadExercises]);
+  }, [pollingJobId, addSession, refresh]);
 
   async function submitVideo(videoUri: string) {
     setErrorMessage(null);
-    setJob(null);
 
+    if (!selectedExercise) {
+      setErrorMessage('Choose which FMS test this video shows before uploading.');
+      return;
+    }
+    if (!token) {
+      setErrorMessage('Your session has expired. Sign in again.');
+      return;
+    }
+
+    setJob(null);
     try {
-      if (!token) {
-        setErrorMessage('Your session has expired. Sign in again.');
-        return;
-      }
       const created = await createAnalysisJob({
         uri: videoUri,
         exercise: selectedExercise,
+        side: selectedSide ?? undefined,
         token,
         patientId,
       });
       setJob(created);
-      startPolling(created.id);
+      setPollingJobId(created.id);
+      // Cleared only after the request succeeded, so a failed upload keeps the
+      // selection for a retry. The next upload has to be chosen deliberately.
+      setSelectedExercise(null);
+      setSelectedSide(null);
     } catch (error) {
       setErrorMessage((error as Error).message);
     }
@@ -101,45 +149,6 @@ export default function ScreeningRecorder({
 
     await submitVideo(recordedVideoUri);
     setRecordedVideoUri(null);
-  }
-
-  function startPolling(jobId: string) {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        const nextJob = await fetchAnalysisJob(jobId);
-        setJob(nextJob);
-
-        if (nextJob.status === 'completed' && nextJob.result) {
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
-
-          const summary: SessionSummary = {
-            id: nextJob.id,
-            createdAt: nextJob.updatedAt,
-            ...nextJob.result,
-          };
-          addSession(summary);
-          void refresh();
-          router.push(completeHref as never);
-        }
-
-        if (nextJob.status === 'failed') {
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
-          setErrorMessage(nextJob.error?.message ?? 'Analysis failed');
-        }
-      } catch (error) {
-        setErrorMessage((error as Error).message);
-      }
-    }, POLL_MS);
   }
 
   async function openCamera() {
@@ -243,6 +252,40 @@ export default function ScreeningRecorder({
           )}
         </View>
 
+        {selectedExercise && BILATERAL_TESTS.has(selectedExercise) ? (
+          <View style={styles.configCard}>
+            <Text style={styles.cardTitle}>Which side is this?</Text>
+            <Text style={styles.hintText}>
+              Optional. Leave blank and the side is detected from the video. State it when
+              the clip shows one side only — a separate left or right recording always does.
+            </Text>
+            <View style={styles.chipRow}>
+              {(['left', 'right'] as const).map((option) => {
+                const active = selectedSide === option;
+                return (
+                  <Pressable
+                    key={option}
+                    style={[styles.chip, active ? styles.chipActive : null]}
+                    // Tapping the active option clears it, back to detection.
+                    onPress={() => setSelectedSide(active ? null : option)}>
+                    <Text style={[styles.chipText, active ? styles.chipTextActive : null]}>
+                      {option === 'left' ? 'Left' : 'Right'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                style={[styles.chip, selectedSide === null ? styles.chipActive : null]}
+                onPress={() => setSelectedSide(null)}>
+                <Text
+                  style={[styles.chipText, selectedSide === null ? styles.chipTextActive : null]}>
+                  Detect automatically
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         {showCamera ? (
           <View style={styles.cameraCard}>
             <View style={styles.cameraHeader}>
@@ -281,12 +324,26 @@ export default function ScreeningRecorder({
           </View>
         ) : (
           <View style={styles.actionsCard}>
-            <Pressable style={[styles.bigButton, styles.cameraButton]} onPress={openCamera}>
+            {/* Disabled until a test is chosen, so a video can never be sent
+                under an unstated exercise. */}
+            {!selectedExercise ? (
+              <Text style={styles.chooseFirst}>
+                Choose an FMS test above to enable recording and upload.
+              </Text>
+            ) : null}
+
+            <Pressable
+              style={[styles.bigButton, styles.cameraButton, !selectedExercise && styles.buttonDisabled]}
+              disabled={!selectedExercise}
+              onPress={openCamera}>
               <Text style={styles.bigButtonTitle}>Record with camera</Text>
               <Text style={styles.bigButtonMeta}>Film your rep and send it to the analysis server</Text>
             </Pressable>
 
-            <Pressable style={[styles.bigButton, styles.uploadButton]} onPress={pickFromGallery}>
+            <Pressable
+              style={[styles.bigButton, styles.uploadButton, !selectedExercise && styles.buttonDisabled]}
+              disabled={!selectedExercise}
+              onPress={pickFromGallery}>
               <Text style={styles.bigButtonTitle}>Choose from gallery</Text>
               <Text style={styles.bigButtonMeta}>Upload MP4/MOV clip for feedback</Text>
             </Pressable>
@@ -309,15 +366,61 @@ export default function ScreeningRecorder({
           <Text style={styles.cardTitle}>Analysis status</Text>
           {job ? (
             <>
-              <Text style={styles.statusLine}>Job: {job.status}</Text>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${Math.round(job.progress * 100)}%` }]} />
-              </View>
-              <Text style={styles.progressLabel}>{Math.round(job.progress * 100)}%</Text>
-              {job.result ? (
-                <Text style={styles.statusLine}>
-                  {job.result.testName}: {formatScore(job.result.score, job.result.maxScore)}
+              <View style={styles.statusRow}>
+                <Text
+                  style={[
+                    styles.statusBadge,
+                    job.status === 'completed'
+                      ? styles.statusDone
+                      : job.status === 'failed'
+                        ? styles.statusFailed
+                        : styles.statusRunning,
+                  ]}>
+                  {job.status === 'completed'
+                    ? 'Completed'
+                    : job.status === 'failed'
+                      ? 'Failed'
+                      : job.status === 'running'
+                        ? 'Processing'
+                        : 'Queued'}
                 </Text>
+                {/* The test the job was actually submitted as, so a wrong
+                    choice is visible here rather than only in the result. */}
+                <Text style={styles.statusTest}>{job.testName}</Text>
+              </View>
+
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    // A completed job always reads 100%, never whatever the
+                    // last poll happened to catch.
+                    { width: `${job.status === 'completed' ? 100 : Math.round(job.progress * 100)}%` },
+                    job.status === 'completed' ? styles.progressFillDone : null,
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressLabel}>
+                {job.status === 'completed' ? '100%' : `${Math.round(job.progress * 100)}%`}
+              </Text>
+
+              {job.status === 'completed' && job.result ? (
+                <View style={styles.resultBlock}>
+                  <Text style={styles.resultScore}>
+                    {job.result.testName}: {formatScore(job.result.score, job.result.maxScore)}
+                  </Text>
+                  <Text style={styles.resultMeta}>
+                    {job.result.faults.length === 0
+                      ? 'No faults detected'
+                      : `${job.result.faults.length} fault${job.result.faults.length === 1 ? '' : 's'} detected`}
+                    {job.result.sideCoverage === 'single' ? ' · single side recorded' : ''}
+                  </Text>
+                  <Pressable
+                    style={styles.viewButton}
+                    onPress={() => router.push(completeHref as never)}>
+                    <Text style={styles.viewButtonText}>View screening</Text>
+                  </Pressable>
+                </View>
               ) : null}
             </>
           ) : (
@@ -332,6 +435,36 @@ export default function ScreeningRecorder({
 }
 
 const styles = StyleSheet.create({
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8 },
+  statusBadge: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
+  statusRunning: { color: '#8a6a1f', backgroundColor: '#fdf3dc' },
+  statusDone: { color: '#0f6b4f', backgroundColor: '#dcefe6' },
+  statusFailed: { color: '#a03a3a', backgroundColor: '#fdeaea' },
+  statusTest: { flex: 1, fontSize: 13, fontWeight: '700', color: '#1f2937' },
+  progressFillDone: { backgroundColor: '#0f9f7c' },
+  resultBlock: { marginTop: 10, gap: 4 },
+  resultScore: { fontSize: 17, fontWeight: '800', color: '#1f2937' },
+  resultMeta: { fontSize: 12, color: '#64748b' },
+  viewButton: {
+    marginTop: 8,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#10b7aa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewButtonText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
+  chooseFirst: { fontSize: 13, color: '#8a6a1f', marginBottom: 4 },
+  buttonDisabled: { opacity: 0.4 },
   safeArea: {
     flex: 1,
     backgroundColor: '#edf0f4',
