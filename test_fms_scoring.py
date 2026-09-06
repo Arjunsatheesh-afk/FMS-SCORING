@@ -349,6 +349,76 @@ class SideSplitTests(unittest.TestCase):
         """A clip with no changeover must stay whole, not be halved arbitrarily."""
         self.assertIsNone(fms_scoring.split_sides("active_straight_leg_raise", aslr_frames(120, 0)))
 
+    def test_declared_side_beats_detection(self):
+        """A stated side wins over any signal, and stops the clip being split.
+
+        The frames here would split cleanly on their own; declaring a side must
+        override that, because splitting a recording the doctor says is
+        one-sided would invent a second side out of noise.
+        """
+        frames = aslr_frames(60, 60)
+        self.assertIsNotNone(fms_scoring.split_sides("active_straight_leg_raise", frames))
+
+        declared = FMSScorer().score(
+            "active_straight_leg_raise", frames, declared_side="left"
+        )
+        self.assertEqual(declared["sideCoverage"], "single")
+        self.assertEqual(declared["declaredSide"], "left")
+        self.assertNotIn("sides", declared, "a declared clip must not be split")
+        self.assertNotIn("finalScore", declared)
+
+        # Without a declaration the same frames split as before.
+        detected = FMSScorer().score("active_straight_leg_raise", frames)
+        self.assertEqual(detected["sideCoverage"], "split")
+        self.assertIsNone(detected["declaredSide"])
+        self.assertIn("sides", detected)
+
+    def test_declaration_conflict_is_flagged_but_not_enforced(self):
+        """A declared side on a two-sided clip is honoured, and reported.
+
+        Silence would be the bad outcome here: the whole-clip score would be
+        presented as one side's with nothing to suggest otherwise.
+        """
+        result = FMSScorer().score(
+            "active_straight_leg_raise", aslr_frames(60, 60), declared_side="left"
+        )
+        self.assertEqual(result["sideCoverage"], "single", "declaration still wins")
+        self.assertNotIn("sides", result, "and the clip is still not split")
+        self.assertTrue(result["declarationConflict"])
+        self.assertEqual(result["detectedCoverage"], "split")
+
+    def test_no_conflict_when_the_clip_really_is_one_sided(self):
+        result = FMSScorer().score(
+            "active_straight_leg_raise", aslr_frames(120, 0), declared_side="left"
+        )
+        self.assertEqual(result["sideCoverage"], "single")
+        self.assertFalse(result["declarationConflict"])
+        self.assertEqual(result["detectedCoverage"], "single")
+
+    def test_no_conflict_flag_without_a_declaration(self):
+        result = FMSScorer().score("active_straight_leg_raise", aslr_frames(60, 60))
+        self.assertFalse(result["declarationConflict"])
+        self.assertIsNone(result["detectedCoverage"])
+
+    def test_blank_or_invalid_declaration_falls_back_to_detection(self):
+        frames = aslr_frames(60, 60)
+        for value in (None, "", "   ", "banana", "LEFTish"):
+            with self.subTest(declared=value):
+                result = FMSScorer().score(
+                    "active_straight_leg_raise", frames, declared_side=value
+                )
+                self.assertIsNone(result["declaredSide"])
+                self.assertEqual(result["sideCoverage"], "split")
+
+    def test_declaration_is_normalised(self):
+        for value, expected in (("Left", "left"), ("  RIGHT ", "right")):
+            with self.subTest(declared=value):
+                result = FMSScorer().score(
+                    "active_straight_leg_raise", aslr_frames(60, 60), declared_side=value
+                )
+                self.assertEqual(result["declaredSide"], expected)
+                self.assertEqual(result["sideCoverage"], "single")
+
     def test_final_score_is_the_lower_side(self):
         result = FMSScorer().score("active_straight_leg_raise", aslr_frames(60, 60))
         self.assertIn("sides", result)

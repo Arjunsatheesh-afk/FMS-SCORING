@@ -1,4 +1,5 @@
 import {
+  AnalysisResult,
   FmsCheck,
   FmsScoreBand,
   FmsSideResult,
@@ -71,6 +72,24 @@ export const SIDE_SPLIT_TESTS: ReadonlySet<FmsTestId> = new Set<FmsTestId>([
   'active_straight_leg_raise',
   'rotary_stability',
 ]);
+
+/**
+ * Tests that already score both sides within one attempt and report the lower.
+ * Shoulder mobility measures each top-hand side on every frame, so its raw
+ * score IS the bilateral figure — it must not read as pending, and equally must
+ * not read as single-sided.
+ */
+export const SCORES_BOTH_SIDES_INTERNALLY: ReadonlySet<FmsTestId> = new Set<FmsTestId>([
+  'shoulder_mobility',
+]);
+
+/** Why a row's Final Score is what it is — shown under the figure. */
+export type FinalBasis =
+  | 'lower side'
+  | 'both sides scored'
+  | 'single side recorded'
+  | '= raw'
+  | null;
 
 export interface MeasurementSpec {
   key: string;
@@ -363,9 +382,13 @@ export interface ReportRow {
   screening: StoredResult | null;
   /** Per-side results where the clip could be split, else null. */
   sides: FmsSideResult[] | null;
+  /** Scorer-computed side coverage; see AnalysisResult.sideCoverage. */
+  coverage: AnalysisResult['sideCoverage'] | null;
   rawScore: number | null;
-  /** null when pending side pairing, or when there is no screening at all. */
+  /** null when no rule produced a figure, or when there is no screening. */
   finalScore: number | null;
+  /** Why the final score is what it is, shown under the figure. */
+  finalBasis: FinalBasis;
   finalPending: boolean;
 }
 
@@ -391,15 +414,31 @@ export function buildReportRows(results: StoredResult[]): ReportRow[] {
     const screening = latest.get(testId) ?? null;
     const rawScore = screening?.result.score ?? null;
     const bilateral = BILATERAL_TESTS.has(testId);
-    // Where the video split into two sides, the clinical figure is the lower of
-    // them and the scorer has already worked it out. Otherwise a bilateral test
-    // stays pending: either it is one of the two awaiting separate recordings,
-    // or this particular clip had no detectable switch.
     const sides = screening?.result.sides ?? null;
-    const splitFinal =
-      sides && typeof screening?.result.finalScore === 'number'
-        ? screening.result.finalScore
-        : null;
+    const coverage = screening?.result.sideCoverage ?? null;
+
+    // Four outcomes, in priority order. Nothing here is derived from pose data:
+    // both `sides` and `sideCoverage` are computed by the scorer and stored.
+    let finalScore: number | null = null;
+    let finalBasis: FinalBasis = null;
+    if (screening) {
+      if (sides && typeof screening.result.finalScore === 'number') {
+        finalScore = screening.result.finalScore;
+        finalBasis = 'lower side';
+      } else if (SCORES_BOTH_SIDES_INTERNALLY.has(testId)) {
+        // The raw score already IS the lower of the two sides.
+        finalScore = rawScore;
+        finalBasis = 'both sides scored';
+      } else if (coverage === 'single') {
+        // One side only, so that side's score stands. It is the lower of one
+        // rather than of two, which is why the label has to say so.
+        finalScore = rawScore;
+        finalBasis = 'single side recorded';
+      } else if (!bilateral) {
+        finalScore = finalScoreFor(testId, rawScore);
+        finalBasis = '= raw';
+      }
+    }
 
     return {
       testId,
@@ -408,10 +447,12 @@ export function buildReportRows(results: StoredResult[]): ReportRow[] {
       screening,
       rawScore,
       sides,
-      finalScore: splitFinal ?? (screening ? finalScoreFor(testId, rawScore) : null),
-      // Only a screened bilateral test with no usable split is *pending*; an
-      // unscreened one is simply absent, shown as an em dash instead.
-      finalPending: bilateral && screening !== null && splitFinal === null,
+      coverage,
+      finalScore,
+      finalBasis,
+      // Pending only when a screening exists and none of the four rules
+      // produced a figure; an unscreened test is absent, shown as an em dash.
+      finalPending: screening !== null && finalScore === null,
     };
   });
 }

@@ -140,6 +140,25 @@ export interface AnalysisResult {
   sides?: FmsSideResult[];
   /** The lower of the two side scores — the clinical figure. */
   finalScore?: number | null;
+  /**
+   * How much of a bilateral test this attempt covers.
+   * 'internal' — the test scores both sides itself (shoulder mobility)
+   * 'split'    — two sides were found and scored separately
+   * 'single'   — only one side is present, so its score is the final score
+   * 'both'     — both sides present but not separable, so no final score
+   * 'unknown'  — no signal strong enough to say
+   */
+  sideCoverage?: 'internal' | 'split' | 'single' | 'both' | 'unknown';
+  /** The side the doctor stated at upload, which overrides detection. */
+  declaredSide?: string | null;
+  /** What detection would have said on its own; set only when a side was declared. */
+  detectedCoverage?: 'internal' | 'split' | 'single' | 'both' | 'unknown' | null;
+  /**
+   * True when a side was declared but detection independently found both sides.
+   * The declaration still stands — this only stops the disagreement being
+   * silent.
+   */
+  declarationConflict?: boolean;
   /** Absent when the overlay render failed or was not attempted. */
   annotatedVideo?: AnnotatedVideo;
   annotatedVideoError?: string;
@@ -163,6 +182,10 @@ export interface SessionSummary extends AnalysisResult {
   /** Who submitted this screening - the patient themselves, or their doctor. */
   uploadedBy?: number;
   uploadedByName?: string | null;
+  /** The clinician's own score, read-only on the patient screens. */
+  manualScore?: number | null;
+  manualScoreByName?: string | null;
+  manualScoreAt?: string | null;
 }
 
 /** A row from GET /me/results or GET /patients/{id}/results. */
@@ -173,6 +196,14 @@ export interface StoredResult {
   uploadedByName: string | null;
   jobId: string;
   createdAt: string;
+  /**
+   * The clinician's own 0–3 score, kept beside the automated one rather than
+   * replacing it. Null means not yet scored — distinct from a manual 0, which
+   * is the FMS score for pain during the movement.
+   */
+  manualScore: number | null;
+  manualScoreByName: string | null;
+  manualScoreAt: string | null;
   /** Full FMSScorer output, same shape a freshly polled job returns. */
   result: AnalysisResult;
 }

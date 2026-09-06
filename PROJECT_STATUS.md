@@ -91,8 +91,9 @@ auth_store.py             SQLite: users, tokens, results. All SQL is here.
 annotate_video.py         Skeleton-overlay renderer (reads cached keypoints, no detector).
 run_all_samples.py        Batch runner over the Dataset/ folder tree.
 seed_accounts.py          Creates the doctor + demo patients.
-test_fms_scoring.py       18 tests, covering the threshold table and side splitting
-                          against the scoring code. See section 13.
+test_fms_scoring.py       24 tests: the threshold table guarded against the
+                          scoring code, side splitting, and the declared-side
+                          rules. See section 13.
 
 analysis/                 Five throwaway-but-kept analysis scripts from the camera-angle
                           investigation (candidate_metrics.py, candidate_metrics2.py,
@@ -643,6 +644,68 @@ halves the same label on 7 clips.
 `sides` and `finalScore` arrive alongside it. Re-scoring all 126 videos confirmed the split
 moved **nothing** — the only difference from the baseline remains the ASLR hip check below.
 
+### Manual FMS Score (added 6 Sep 2026)
+
+A clinician's own 0–3 score stored **beside** the automated one — the point is to compare
+them, not replace one with the other. It sits at the top of the Measurements section on
+the screening detail view, with the automated score restated above it.
+
+- `PATCH /results/{job_id}/manual-score`, doctor-only and ownership-checked like the video
+  route. `manual_score`, `manual_score_by`, `manual_score_at` were added to `results` by a
+  `PRAGMA`-guarded `ALTER TABLE`, since `CREATE TABLE IF NOT EXISTS` will not add columns.
+- **Four buttons, not a text field.** The score has exactly four valid values, so an
+  invalid entry is impossible and no keyboard is needed. Saves on tap.
+- **`null` clears it; `0` does not.** Zero is the FMS score for pain reported, so "not yet
+  scored" has to stay its own state. Clearing also clears authorship — a name against a
+  blank value would misrepresent who scored what.
+- Patients see it **read-only** on their progress screen (`Physio score 2/3 · Dr. …`).
+  There is no editing path for them anywhere, and the server rejects them regardless.
+
+The screening detail view also shows the same measurement-and-threshold rows as the
+report, reusing `buildMeasurementRows` rather than a second implementation.
+
+### Final Score: four outcomes (added 6 Sep 2026)
+
+A bilateral row's Final Score is decided in this order, all of it from fields the **scorer**
+computes and stores — nothing is derived in the client:
+
+| # | Condition | Final | Label |
+|---|---|---|---|
+| 1 | The clip split into two sides | `min(A, B)` | lower side |
+| 2 | The test scores both sides itself (shoulder mobility) | raw | both sides scored |
+| 3 | Only one side present | raw | single side recorded |
+| 4 | Both sides present but not separable, or signal unusable | — | pending |
+
+**Rule 2 fixed an existing inaccuracy.** Shoulder Mobility measures both hands in all 18
+reference videos and already reports the lower — verified 18/18 — yet showed *Pending*
+purely because it sat in the bilateral list.
+
+`sideCoverage` is `'internal' | 'split' | 'single' | 'both' | 'unknown'`. Coverage signals
+were added for hurdle step (which ankle is higher) and inline lunge (lead foot **and**
+facing). Inline lunge needs both: judged on the foot alone, a subject who turns around
+reads as one-sided — an error that would have mislabelled 9 clips.
+
+Across the 90 bilateral videos: hurdle step 18 both; inline lunge 1 single / 17 both;
+shoulder mobility 18 internal; ASLR 15 split / 3 both; rotary 13 split / 5 single.
+
+### Declared side beats detection
+
+`POST /analysis/jobs` takes an optional `side` (`left`/`right`), surfaced in the recorder
+as a **Which side is this?** picker on bilateral tests, defaulting to *Detect
+automatically*. Blank or invalid input falls back to detection; case and whitespace are
+normalised.
+
+**A declaration wins outright, and a declared clip is not split at all** — splitting a
+recording the doctor says is one-sided would invent a second side out of noise. The person
+who filmed it knows what is in it; every signal here is a heuristic, and one has already
+been wrong once (see the side-label note above).
+
+Because the declaration is absolute, detection still runs **for reporting only**. When it
+independently finds both sides, the result carries `declarationConflict: true` and
+`detectedCoverage`, and the report shows an advisory note — *"this clip appears to contain
+both sides; using your declared single-side selection anyway."* The declaration is still
+what was used; the disagreement simply is not silent.
+
 ### ASLR: resting-leg hip flexion is now a real check
 
 The one pending item that was measurable today — sagittal view, both hip angles already
@@ -754,7 +817,7 @@ once the department signs the numbers off — that is when the distinction start
    `requirements-win.txt` is unfinished work.
 
 9. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
-   **18 tests** with the threshold and side-splitting work (section 12), which now guard the declared
+   **24 tests** with the threshold, side-splitting and declared-side work (section 12), which now guard the declared
    thresholds against the scoring code and asserts that pending checks can never be
    evaluated. Still missing: per-fault behavioural coverage for
    the other six tests — only the deep squat's depth fault is exercised end to end — and

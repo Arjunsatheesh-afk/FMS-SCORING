@@ -221,10 +221,10 @@ function ReportRowView({
                 {row.finalScore}
                 <Text style={styles.scoreMax}>/3</Text>
               </Text>
-              {/* Where the clip was split the final is the lower side, which
-                  can differ from the whole-clip raw score — so it must not
-                  claim to equal it. */}
-              <Text style={styles.equalsRaw}>{row.sides ? 'lower side' : '= raw'}</Text>
+              {/* Says which of the four rules produced this figure. A
+                  single-side final is the lower of one rather than of two, so
+                  the basis is never left implicit. */}
+              <Text style={styles.equalsRaw}>{row.finalBasis}</Text>
             </>
           )}
         </View>
@@ -349,9 +349,30 @@ function ReportRowView({
 
               {row.finalPending ? (
                 <Text style={styles.pendingNote}>
-                  {SIDE_SPLIT_TESTS.has(row.testId)
-                    ? 'Final score pending: no side switch could be detected in this clip, so the two sides could not be scored separately.'
-                    : 'Final score pending: this movement is scored on each side clinically and the lower is recorded. Awaiting separate left/right recordings.'}
+                  {row.coverage === 'both'
+                    ? 'Final score pending: both sides are present in this clip but could not be separated, so neither can be scored on its own.'
+                    : row.coverage === 'unknown'
+                      ? 'Final score pending: the pose data is not clear enough to tell which side or sides this clip covers.'
+                      : 'Final score pending: this movement is scored on each side clinically and the lower is recorded. Awaiting separate left/right recordings.'}
+                </Text>
+              ) : null}
+
+              {row.finalBasis === 'single side recorded' ? (
+                <Text style={styles.singleSideNote}>
+                  Only one side was recorded, so this is that side&apos;s score — the lower
+                  of one rather than of two. It may read higher than a full bilateral score.
+                  {row.screening?.result.declaredSide
+                    ? ` Side stated at upload: ${row.screening.result.declaredSide}.`
+                    : ''}
+                </Text>
+              ) : null}
+
+              {/* Advisory only. The declared side is still what was used — this
+                  exists so a disagreement is never silent. */}
+              {row.screening?.result.declarationConflict ? (
+                <Text style={styles.conflictNote}>
+                  Note: this clip appears to contain both sides; using your declared
+                  single-side selection anyway.
                 </Text>
               ) : null}
             </>
@@ -597,6 +618,19 @@ const styles = StyleSheet.create({
   },
   noFaults: { fontSize: 14, color: '#64748b' },
   pendingNote: { fontSize: 12, color: '#8a6a1f', lineHeight: 17, marginTop: 10 },
+  singleSideNote: { fontSize: 12, color: '#8a6a1f', lineHeight: 17, marginTop: 10 },
+  // Advisory, not an error: distinct enough to notice, not alarming.
+  conflictNote: {
+    fontSize: 12,
+    color: '#8a5a00',
+    lineHeight: 17,
+    marginTop: 8,
+    backgroundColor: '#fff4e5',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    overflow: 'hidden',
+  },
 
   compositeRow: {
     flexDirection: 'row',

@@ -82,6 +82,13 @@ export default function ProgressScreen() {
                   {uploaderLabel(session, user?.id) ? (
                     <Text style={styles.detailUploader}>{uploaderLabel(session, user?.id)}</Text>
                   ) : null}
+                  {/* Read-only: only a doctor can record this. */}
+                  {typeof session.manualScore === 'number' ? (
+                    <Text style={styles.detailManual}>
+                      Physio score {formatScore(session.manualScore, session.maxScore)}
+                      {session.manualScoreByName ? ` · ${session.manualScoreByName}` : ''}
+                    </Text>
+                  ) : null}
                 </View>
                 <Text style={[styles.detailScore, { color: scoreColor(session.score) }]}>
                   {formatScore(session.score, session.maxScore)}
@@ -212,6 +219,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#0f9f95',
     fontWeight: '700',
+  },
+  detailManual: {
+    fontSize: 11,
+    color: '#8a6a1f',
+    fontWeight: '700',
+    marginTop: 1,
   },
   detailScore: {
     fontWeight: '700',

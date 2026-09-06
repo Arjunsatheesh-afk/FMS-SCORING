@@ -97,6 +97,7 @@ def _analyze_video_job(
     shoulder_width_in: float,
     patient_id: int,
     uploaded_by: int,
+    declared_side: str | None = None,
 ) -> None:
     tracked_json = TRACKED_DIR / test_id / f"{job_id}.json"
     try:
@@ -146,6 +147,7 @@ def _analyze_video_job(
             pain=pain,
             hand_length_in=hand_length_in,
             shoulder_width_in=shoulder_width_in,
+            declared_side=declared_side,
         )
 
         summary = result | {
@@ -391,6 +393,38 @@ def annotated_video(
     )
 
 
+class ManualScoreRequest(BaseModel):
+    # Null clears the score. 0 is a real FMS score (pain reported), so the two
+    # must stay distinguishable.
+    manualScore: int | None = None
+
+
+@app.patch("/results/{job_id}/manual-score")
+def set_manual_score(
+    job_id: str,
+    payload: ManualScoreRequest,
+    doctor: dict[str, Any] = Depends(current_doctor),
+) -> dict[str, Any]:
+    """Record the clinician's own score for a screening, beside the automated one.
+
+    Doctor-only and ownership-checked, exactly like the video route: this writes
+    to a patient's clinical record.
+    """
+    stored = auth_store.result_for_job(job_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Screening not found")
+    if auth_store.patient_of_doctor(doctor["id"], stored["patientId"]) is None:
+        raise HTTPException(status_code=403, detail="Not one of your patients")
+
+    try:
+        updated = auth_store.set_manual_score(job_id, payload.manualScore, doctor["id"])
+    except auth_store.AuthError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Screening not found")
+    return {"result": updated}
+
+
 @app.delete("/results/{job_id}")
 def delete_screening(
     job_id: str,
@@ -476,6 +510,9 @@ async def create_analysis_job(
     hand_length_in: float = Form(DEFAULT_HAND_LENGTH_IN),
     shoulder_width_in: float = Form(DEFAULT_SHOULDER_WIDTH_IN),
     patient_id: int | None = Form(default=None),
+    # Optional. When the doctor knows which side a clip shows - and a separate
+    # left/right file always does - that beats any signal the scorer can read.
+    side: str | None = Form(default=None),
     file: UploadFile = File(...),
     user: dict[str, Any] = Depends(current_user),
 ) -> dict[str, Any]:
@@ -539,6 +576,7 @@ async def create_analysis_job(
             "pain": pain,
             "hand_length_in": hand_length_in,
             "shoulder_width_in": shoulder_width_in,
+            "declared_side": side,
             "patient_id": target_patient["id"],
             "uploaded_by": user["id"],
         },

@@ -102,6 +102,21 @@ def init_db() -> None:
             """
         )
 
+        # CREATE TABLE IF NOT EXISTS will not add a column to a table that
+        # already exists, so new columns need an explicit migration. Guarded by
+        # a PRAGMA read so it is safe to run on every start.
+        existing = {row[1] for row in connection.execute("PRAGMA table_info(results)")}
+        migrations = {
+            # 0-3, or NULL for "no clinician score yet". Range is enforced in
+            # set_manual_score: SQLite cannot add a CHECK to an existing table.
+            "manual_score": "INTEGER",
+            "manual_score_by": "INTEGER REFERENCES users(id)",
+            "manual_score_at": "TEXT",
+        }
+        for column, definition in migrations.items():
+            if column not in existing:
+                connection.execute(f"ALTER TABLE results ADD COLUMN {column} {definition}")
+
 
 def normalize_email(email: str) -> str:
     return (email or "").strip().lower()
@@ -332,6 +347,13 @@ def _row_to_result(row: sqlite3.Row) -> dict[str, Any]:
         "uploadedByName": row["uploaded_by_name"] if "uploaded_by_name" in row.keys() else None,
         "jobId": row["job_id"],
         "createdAt": row["created_at"],
+        # The clinician's own score, kept beside the automated one rather than
+        # replacing it - the point is to compare them.
+        "manualScore": row["manual_score"] if "manual_score" in row.keys() else None,
+        "manualScoreByName": (
+            row["manual_score_by_name"] if "manual_score_by_name" in row.keys() else None
+        ),
+        "manualScoreAt": row["manual_score_at"] if "manual_score_at" in row.keys() else None,
         # The full scorer output, so clients render the same shape they get
         # from a freshly polled job.
         "result": stored,
@@ -376,14 +398,55 @@ def result_for_job(job_id: str) -> dict[str, Any] | None:
     with _lock, _connect() as connection:
         row = connection.execute(
             """
-            SELECT results.*, uploader.display_name AS uploaded_by_name
+            SELECT results.*,
+                   uploader.display_name AS uploaded_by_name,
+                   scorer.display_name AS manual_score_by_name
             FROM results
             LEFT JOIN users AS uploader ON uploader.id = results.uploaded_by
+            LEFT JOIN users AS scorer ON scorer.id = results.manual_score_by
             WHERE results.job_id = ?
             """,
             (job_id,),
         ).fetchone()
     return _row_to_result(row) if row else None
+
+
+MANUAL_SCORE_RANGE = (0, 3)
+
+
+def set_manual_score(job_id: str, score: int | None, recorded_by: int) -> dict[str, Any] | None:
+    """Record a clinician's own score for one screening, or clear it.
+
+    `None` clears it, which is distinct from a manual 0 - zero is the FMS score
+    for pain reported during the movement, so "not yet scored" must stay its own
+    state. The range is checked here because SQLite cannot add a CHECK
+    constraint to a table that already exists.
+    """
+    if score is not None:
+        low, high = MANUAL_SCORE_RANGE
+        if not isinstance(score, int) or isinstance(score, bool) or not low <= score <= high:
+            raise AuthError(f"Manual score must be an integer {low}-{high}, or null to clear")
+
+    with _lock, _connect() as connection:
+        existing = connection.execute(
+            "SELECT id FROM results WHERE job_id = ?", (job_id,)
+        ).fetchone()
+        if existing is None:
+            return None
+        connection.execute(
+            """
+            UPDATE results
+               SET manual_score = ?,
+                   manual_score_by = ?,
+                   manual_score_at = ?
+             WHERE job_id = ?
+            """,
+            # Clearing the score clears its authorship too: keeping a name
+            # against a blank value would misrepresent who scored what.
+            (score, recorded_by if score is not None else None,
+             _utc_now().isoformat() if score is not None else None, job_id),
+        )
+    return result_for_job(job_id)
 
 
 def delete_result(job_id: str) -> dict[str, Any] | None:
@@ -397,9 +460,12 @@ def delete_result(job_id: str) -> dict[str, Any] | None:
     with _lock, _connect() as connection:
         row = connection.execute(
             """
-            SELECT results.*, uploader.display_name AS uploaded_by_name
+            SELECT results.*,
+                   uploader.display_name AS uploaded_by_name,
+                   scorer.display_name AS manual_score_by_name
             FROM results
             LEFT JOIN users AS uploader ON uploader.id = results.uploaded_by
+            LEFT JOIN users AS scorer ON scorer.id = results.manual_score_by
             WHERE results.job_id = ?
             """,
             (job_id,),
@@ -425,9 +491,12 @@ def results_for_patient(patient_id: int) -> list[dict[str, Any]]:
     with _lock, _connect() as connection:
         rows = connection.execute(
             """
-            SELECT results.*, uploader.display_name AS uploaded_by_name
+            SELECT results.*,
+                   uploader.display_name AS uploaded_by_name,
+                   scorer.display_name AS manual_score_by_name
             FROM results
             LEFT JOIN users AS uploader ON uploader.id = results.uploaded_by
+            LEFT JOIN users AS scorer ON scorer.id = results.manual_score_by
             WHERE results.patient_id = ?
             ORDER BY results.created_at DESC
             """,

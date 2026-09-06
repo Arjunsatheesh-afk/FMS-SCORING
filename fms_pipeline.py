@@ -276,6 +276,7 @@ def score_tracked_file(
     pain: bool = False,
     hand_length_in: float = 8.0,
     shoulder_width_in: float = 16.0,
+    declared_side: str | None = None,
 ) -> dict[str, Any]:
     from fms_scoring import frames_from_tracked_json
 
@@ -289,6 +290,7 @@ def score_tracked_file(
         expected_fault=expected_fault,
         hand_length_in=hand_length_in,
         shoulder_width_in=shoulder_width_in,
+        declared_side=declared_side,
     )
     result["source"] = data.get("metadata", {}).get("source", str(tracked_json))
     result["trackedJson"] = str(tracked_json)

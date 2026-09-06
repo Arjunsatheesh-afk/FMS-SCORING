@@ -23,6 +23,11 @@ function toSession(row: StoredResult): SessionSummary {
     createdAt: row.createdAt,
     uploadedBy: row.uploadedBy,
     uploadedByName: row.uploadedByName,
+    // Carried through so a patient sees their physio's own score read-only
+    // beside the automated one.
+    manualScore: row.manualScore,
+    manualScoreByName: row.manualScoreByName,
+    manualScoreAt: row.manualScoreAt,
   };
 }
 

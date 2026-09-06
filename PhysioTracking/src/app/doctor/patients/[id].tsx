@@ -4,15 +4,14 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ManualScorePanel } from '@/components/manual-score-panel';
 import { PatientViewSwitch } from '@/components/patient-view-switch';
 import { useAuth } from '@/context/auth-context';
-import { API_BASE_URL, fetchPatientResults } from '@/lib/api';
+import { API_BASE_URL, fetchPatientResults, fetchThresholds, setManualScore } from '@/lib/api';
 import {
-  NON_CLINICAL_MEASUREMENTS,
+  buildMeasurementRows,
   faultSummary,
   formatFault,
-  formatMeasurementKey,
-  formatMeasurementValue,
   formatScore,
   scoreColor,
   statusLabel,
@@ -20,7 +19,7 @@ import {
 import { initials } from '@/lib/names';
 import { useAuthedVideoSource } from '@/lib/use-authed-video-source';
 import { AuthUser } from '@/types/auth';
-import { StoredResult } from '@/types/analysis';
+import { FmsTestThresholds, StoredResult } from '@/types/analysis';
 
 /**
  * Inline lunge and rotary stability lost checks that cannot be recovered from
@@ -36,7 +35,10 @@ export default function PatientDetailScreen() {
 
   const [patient, setPatient] = useState<AuthUser | null>(null);
   const [results, setResults] = useState<StoredResult[]>([]);
+  const [thresholds, setThresholds] = useState<FmsTestThresholds[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [savingScore, setSavingScore] = useState<number | null>(null);
+  const [scoreError, setScoreError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,15 +46,44 @@ export default function PatientDetailScreen() {
     if (!token || !id) return;
     setError(null);
     try {
-      const body = await fetchPatientResults(token, Number(id));
+      const [body, spec] = await Promise.all([
+        fetchPatientResults(token, Number(id)),
+        fetchThresholds(),
+      ]);
       setPatient(body.patient);
       setResults(body.results);
+      setThresholds(spec);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
   }, [token, id]);
+
+  /** Saves on tap. The row updates optimistically and rolls back on failure. */
+  const saveManualScore = useCallback(
+    async (row: StoredResult, next: number | null) => {
+      if (!token) return;
+      const previous = results;
+      setScoreError(null);
+      setSavingScore(row.id);
+      setResults((current) =>
+        current.map((item) => (item.id === row.id ? { ...item, manualScore: next } : item)),
+      );
+      try {
+        const updated = await setManualScore(token, row.jobId, next);
+        setResults((current) =>
+          current.map((item) => (item.id === row.id ? { ...item, ...updated } : item)),
+        );
+      } catch (err) {
+        setResults(previous);
+        setScoreError((err as Error).message);
+      } finally {
+        setSavingScore(null);
+      }
+    },
+    [token, results],
+  );
 
   // Refetch on focus, not just on mount: returning here after recording a
   // screening would otherwise show the stale list without the new result.
@@ -221,18 +252,57 @@ export default function PatientDetailScreen() {
                       ) : null}
 
                       <Text style={styles.detailTitle}>Measurements</Text>
-                      {Object.entries(row.result.measurements ?? {})
-                        // scoredFrame and friends are internal bookkeeping, not
-                        // clinical findings, and must not sit beside joint angles.
-                        .filter(([key]) => !NON_CLINICAL_MEASUREMENTS.has(key))
-                        .map(([key, value]) => [key, formatMeasurementValue(value)] as const)
-                        .filter((entry): entry is readonly [string, string] => entry[1] !== null)
-                        .map(([key, value]) => (
-                          <View key={key} style={styles.measurement}>
-                            <Text style={styles.measurementKey}>{formatMeasurementKey(key)}</Text>
-                            <Text style={styles.measurementValue}>{value}</Text>
+
+                      <ManualScorePanel
+                        automatedScore={row.result.score}
+                        maxScore={row.result.maxScore}
+                        manualScore={row.manualScore}
+                        manualScoreByName={row.manualScoreByName}
+                        manualScoreAt={row.manualScoreAt}
+                        saving={savingScore === row.id}
+                        error={savingScore === row.id ? null : scoreError}
+                        onChange={(next) => void saveManualScore(row, next)}
+                      />
+
+                      {/* Same rows the report renders, from the same helper -
+                          each measurement beside the threshold that judged it. */}
+                      {buildMeasurementRows(
+                        row.result.test,
+                        row.result.measurements,
+                        thresholds.find((spec) => spec.testId === row.result.test),
+                      ).map((measurement) => (
+                        <View key={measurement.key} style={styles.measurement}>
+                          <View style={styles.measurementTop}>
+                            <Text
+                              style={[
+                                styles.measurementKey,
+                                measurement.value === null && styles.measurementKeyMuted,
+                              ]}>
+                              {measurement.label}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.measurementValue,
+                                measurement.breached && styles.measurementValueBreached,
+                              ]}>
+                              {measurement.value ?? 'not recorded'}
+                            </Text>
                           </View>
-                        ))}
+                          <View style={styles.chipRow}>
+                            {measurement.chips.map((chip) => (
+                              <Text
+                                key={chip.text}
+                                style={[styles.tChip, CHIP_STYLES[chip.state]]}>
+                                {chip.state === 'breached'
+                                  ? `✗ ${chip.text}`
+                                  : chip.state === 'within'
+                                    ? `✓ ${chip.text}`
+                                    : chip.text}
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+                      ))}
                     </View>
                   ) : null}
                 </View>
@@ -245,6 +315,14 @@ export default function PatientDetailScreen() {
     </SafeAreaView>
   );
 }
+
+/** Shared with the report screen so the two views read identically. */
+const CHIP_STYLES = {
+  breached: { color: '#c0392f', backgroundColor: '#fdeaea' },
+  within: { color: '#1d7a5c', backgroundColor: '#e3f4ed' },
+  landed: { color: '#0f9f95', backgroundColor: '#d6f5f2' },
+  none: { color: '#64748b', backgroundColor: '#eef2f6', fontWeight: '500' as const },
+};
 
 /** Tallest a portrait overlay may be, so it cannot swallow the whole card. */
 const MAX_VIDEO_HEIGHT = 380;
@@ -314,16 +392,29 @@ const styles = StyleSheet.create({
   fault: { fontSize: 14, color: '#dc5f5f', lineHeight: 20 },
   notAssessed: { fontSize: 14, color: '#94a3b8', lineHeight: 20 },
   measurement: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 5,
+    paddingVertical: 7,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
+  measurementTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 12,
+  },
   measurementKey: { flex: 1, fontSize: 14, color: '#475569' },
-  measurementValue: { fontSize: 14, fontWeight: '700', color: '#1f2937' },
+  measurementKeyMuted: { color: '#94a3b8' },
+  measurementValue: { fontSize: 15, fontWeight: '700', color: '#1f2937' },
+  measurementValueBreached: { color: '#c0392f' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 4 },
+  tChip: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
   // Dimensions come from overlayBoxStyle; this carries only the chrome.
   video: { borderRadius: 10, backgroundColor: '#000000' },
   videoError: { fontSize: 12, color: '#dc5f5f', marginTop: 4 },

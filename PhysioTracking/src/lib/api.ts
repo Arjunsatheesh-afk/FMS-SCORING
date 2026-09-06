@@ -126,6 +126,30 @@ export async function fetchMyResults(token: string) {
   return body.results;
 }
 
+/**
+ * Record the clinician's own score for a screening. Pass null to clear it.
+ * Doctor-only server-side; the patient views are read-only.
+ */
+export async function setManualScore(token: string, jobId: string, manualScore: number | null) {
+  const response = await fetch(`${API_BASE_URL}/results/${jobId}/manual-score`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ manualScore }),
+  });
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const parsed = await response.json();
+      if (typeof parsed?.detail === 'string') message = parsed.detail;
+    } catch {
+      /* keep the status-only message */
+    }
+    throw new Error(message);
+  }
+  const body = (await response.json()) as { result: StoredResult };
+  return body.result;
+}
+
 export async function fetchPatientResults(token: string, patientId: number) {
   const response = await fetch(`${API_BASE_URL}/patients/${patientId}/results`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -151,8 +175,17 @@ export async function createAnalysisJob(params: {
   /** Calibration used by shoulder_mobility scoring; server defaults apply when omitted. */
   handLengthIn?: number;
   shoulderWidthIn?: number;
+  /**
+   * Optional. Which side a bilateral clip shows. When stated it overrides the
+   * scorer's own detection — a separate left/right file always shows one side,
+   * and the doctor knows which.
+   */
+  side?: 'left' | 'right';
 }) {
   const parameters: Record<string, string> = { exercise: params.exercise };
+  if (params.side) {
+    parameters.side = params.side;
+  }
   if (params.patientId !== undefined) {
     parameters.patient_id = String(params.patientId);
   }

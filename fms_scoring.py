@@ -445,6 +445,102 @@ def _dominant_split(series: list[float | None]) -> int | None:
     return (big[0][2] + big[1][1]) // 2
 
 
+# Tests that already score both sides inside one attempt and report the lower.
+# Shoulder mobility measures each top-hand side on every frame, so its raw score
+# IS the bilateral figure - it must not be shown as pending, and equally must not
+# be labelled single-sided.
+SCORES_BOTH_SIDES_INTERNALLY = ("shoulder_mobility",)
+
+DECLARED_SIDES = ("left", "right")
+
+
+def _normalize_side(value: str | None) -> str | None:
+    """'Left' -> 'left'; anything else, including blank, -> None."""
+    if not value:
+        return None
+    cleaned = value.strip().lower()
+    return cleaned if cleaned in DECLARED_SIDES else None
+
+# Share of confident frames belonging to the *minority* side. Across the 90
+# reference videos this is bimodal - 0% for a genuinely one-sided clip, 23-50%
+# where both sides are present - so anything above this cut means both.
+_COVERAGE_MINORITY = 0.15
+_COVERAGE_MIN_CONF = 0.15  # below this the signal cannot judge either way
+
+
+def _lifted_ankle_signal(frame: FMSFrame) -> float | None:
+    """Which ankle is higher. Positive means the LEFT leg is lifted."""
+    left = _point(frame, "left_ankle")
+    right = _point(frame, "right_ankle")
+    torso = _torso_length(frame)
+    if left is None or right is None or torso is None:
+        return None
+    return float(right[1] - left[1]) / torso
+
+
+def _lead_foot_signal(frame: FMSFrame) -> float | None:
+    """Which foot is forward, in the sagittal view the lunge is filmed from."""
+    left = _point(frame, "left_ankle")
+    right = _point(frame, "right_ankle")
+    torso = _torso_length(frame)
+    if left is None or right is None or torso is None:
+        return None
+    return float(left[0] - right[0]) / torso
+
+
+def _coverage_signals(test_id: str):
+    """Every signal that can reveal a second side for this test.
+
+    Inline lunge needs two: subjects either swapped the lead foot in place or
+    turned around, and a clip is only one-sided if NEITHER signal sees a second
+    side. Judging it on the foot alone reports a turn-around as single-sided.
+    """
+    return {
+        "active_straight_leg_raise": (_aslr_side_signal,),
+        "rotary_stability": (_facing_signal_nose, _facing_signal_shoulders),
+        "hurdle_step": (_lifted_ankle_signal,),
+        "inline_lunge": (_lead_foot_signal, _facing_signal_nose),
+    }.get(test_id, ())
+
+
+def _minority_share(series: list[float | None]) -> float | None:
+    """Fraction of confident frames on the less-represented side, or None."""
+    confident = [value for value in series if value is not None and abs(value) >= _SPLIT_DEADBAND]
+    if not series or len(confident) < _COVERAGE_MIN_CONF * len(series):
+        return None
+    left = sum(1 for value in confident if value > 0)
+    return min(left, len(confident) - left) / len(confident)
+
+
+def side_coverage(test_id: str, frames: list[FMSFrame], *, was_split: bool) -> str:
+    """How much of a bilateral test this attempt actually covers.
+
+    'internal' - the test scores both sides itself (shoulder mobility)
+    'split'    - two sides were found and scored separately
+    'single'   - only one side is present, so its score is the final score
+    'both'     - both sides are present but could not be separated
+    'unknown'  - no signal strong enough to say
+
+    'single' and 'both' are deliberately distinct: a clip can hold both sides
+    and still resist splitting, and calling that single-sided would report a
+    one-legged score as if it were the patient's bilateral result.
+    """
+    if test_id in SCORES_BOTH_SIDES_INTERNALLY:
+        return "internal"
+    if was_split:
+        return "split"
+
+    shares = []
+    for signal in _coverage_signals(test_id):
+        share = _minority_share(_median_filter([signal(frame) for frame in frames], _SPLIT_SMOOTH))
+        if share is not None:
+            shares.append(share)
+    if not shares:
+        return "unknown"
+    # Any signal seeing a substantial second side settles it.
+    return "both" if max(shares) >= _COVERAGE_MINORITY else "single"
+
+
 def dominant_side_label(test_id: str, segment: list[FMSFrame]) -> str | None:
     """Which side a segment belongs to, from the majority of its frames.
 
@@ -641,6 +737,7 @@ class FMSScorer:
         expected_fault: str | None = None,
         hand_length_in: float = 8.0,
         shoulder_width_in: float = 16.0,
+        declared_side: str | None = None,
     ) -> dict[str, Any]:
         if test_id not in FMS_TESTS:
             raise ValueError(f"Unknown FMS test: {test_id}")
@@ -693,15 +790,46 @@ class FMSScorer:
         else:
             result = method(usable)
 
-        # Per-side scoring is ADDITIVE. `score` stays the whole-clip figure it
-        # has always been, so stored results and the validated baseline keep
-        # their meaning; the per-side breakdown and the clinical final score
-        # arrive alongside it in `sides` and `finalScore`.
-        sides = self._score_each_side(test_id, usable, method)
+        # A stated side wins outright over anything inferred from the pose data.
+        # A person who filmed the clip knows what is in it; every automatic
+        # signal here is a heuristic, and one of them has already been wrong
+        # once - the side labels initially read off the scored frame disagreed
+        # with the segment on 7 of 15 clips. So a declared side means the clip
+        # is one side, and it is NOT split: splitting a single-sided recording
+        # would invent a second side out of noise.
+        declared = _normalize_side(declared_side)
+        detected: str | None = None
+        if declared is not None:
+            sides = None
+            coverage = "single"
+            # Detection still runs, purely to report disagreement. A declared
+            # side is honoured either way; the point is that a clip which looks
+            # two-sided should not be silently scored as one.
+            detected = side_coverage(
+                test_id, usable, was_split=split_sides(test_id, usable) is not None
+            )
+        else:
+            # Per-side scoring is ADDITIVE. `score` stays the whole-clip figure
+            # it has always been, so stored results and the validated baseline
+            # keep their meaning; the per-side breakdown and the clinical final
+            # score arrive alongside it in `sides` and `finalScore`.
+            sides = self._score_each_side(test_id, usable, method)
+            coverage = side_coverage(test_id, usable, was_split=sides is not None)
+
         if sides is not None:
             result = result | sides
 
-        return base | result | {"status": "scored"}
+        return base | result | {
+            "status": "scored",
+            "sideCoverage": coverage,
+            "declaredSide": declared,
+            # What detection would have said on its own. Only set when a side
+            # was declared, since otherwise it is simply sideCoverage.
+            "detectedCoverage": detected,
+            # The declaration stands, but the disagreement is recorded so the
+            # report can show it rather than leaving it silent.
+            "declarationConflict": detected in ("both", "split"),
+        }
 
     def _score_each_side(
         self,
