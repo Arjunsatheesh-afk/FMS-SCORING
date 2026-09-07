@@ -868,7 +868,8 @@ once the department signs the numbers off — that is when the distinction start
 
 ### Known technical debt
 
-7. **App froze during a multi-upload session — ROOT CAUSE CONFIRMED, fix unverified.**
+7. **App froze during a multi-upload session — ERRORS FIXED AND VERIFIED; memory
+   accumulation still open.**
 
    **What happened (6 Sep 2026).** Over roughly 20-30 minutes the doctor uploaded 7-8
    videos one after another, 3-4 minutes apart, changing the test picker between each. The
@@ -908,21 +909,74 @@ once the department signs the numbers off — that is when the distinction start
    which sees only *attached* elements, and JS heap, which does not include media buffers.
    Both looked clean while seven detached elements accumulated.
 
-   ### Fix applied — NOT YET VERIFIED AT RUNTIME
+   ### First fix attempt — verified at runtime, and it FAILED
 
-   `patients/[id].tsx` now creates the player **once** with `useVideoPlayer(null)` and
-   re-points it with `player.replaceAsync(source)` / `replace(null)` in an effect, which is
-   the documented way to change source. Typechecks clean.
+   `patients/[id].tsx` was changed to create the player **once** with `useVideoPlayer(null)`
+   and re-point it with `player.replaceAsync(source)` (commit `ba6be05`). That change is
+   correct and has been kept, but on its own it fixed nothing.
 
-   **It could not be verified at runtime:** Metro kept serving a stale bundle
-   (`ReferenceError: useEffect is not defined` from a pre-edit version), so every
-   post-fix measurement re-ran the old code. **Next session must restart the Expo dev
-   server, hard-reload, then repeat the measurement above** — the expected result is
-   `detached elements holding a blob URL: 0` however many screenings are opened, and no
-   errors when `.load()` is forced.
+   Verified 7 Sep on a restarted dev server with `--clear` and a hard reload. A first read
+   appeared to show the stale-bundle error again; it was a red herring. **The browser
+   console buffer in the automation tool is cumulative across a session and survives
+   reloads** — logging a marker, reloading, and confirming the error sat *before* the marker
+   proved the bundle was in fact fresh. Do not trust an unmarked console read.
 
-   *Incidental corroboration:* Metro serving a stale bundle was observed directly here,
-   which is the same mechanism as the stale-tab theory below.
+   Opening five screenings post-fix gave `10 / 1 / 9 / 4` — byte-for-byte the same ratio as
+   the pre-fix baseline of `8 / 1 / 7 / 4` over four screenings. Forcing `.load()` produced
+   **exactly four simultaneous `ERR_FILE_NOT_FOUND`**. No improvement at all.
+
+   **Why it missed.** The diagnosis above named the wrong layer. The screen is an accordion
+   on one route and never unmounts; `useVideoPlayer(null)` runs exactly once. Yet a single
+   source swap still created 2 elements and stranded one more with a blob — isolated with a
+   one-swap delta (`createdByThisOneSwap: 2`). The elements come from **expo-video's web
+   `replaceAsync`, which builds a fresh `HTMLVideoElement` per source and abandons the
+   previous one with its `src` still set.** Stabilising the *player* never touched the
+   element churn one layer below it.
+
+   ### Second fix — VERIFIED WORKING (7 Sep 2026)
+
+   `use-authed-video-source.ts` now **caches one object URL per screening** in a ref and
+   revokes only on unmount, instead of revoking on every source swap. The abandoned elements
+   still exist, but their URLs keep resolving, so nothing errors.
+
+   Verified with the same probe, fresh server, hard reload, six screening opens:
+
+   | screenings opened | ever created | attached | detached | detached holding blob |
+   |---|---|---|---|---|
+   | 1 · Rotary Stability | 2 | 1 | 1 | 0 |
+   | 2 · Trunk Stability Push-Up | 4 | 1 | 3 | 1 |
+   | 3 · Active Straight-Leg Raise | 6 | 1 | 5 | 2 |
+   | 4 · Shoulder Mobility | 8 | 1 | 7 | 3 |
+   | 5 · Inline Lunge | 10 | 1 | 9 | 4 |
+   | 6 · Rotary Stability (revisit) | 11 | 1 | 10 | 5 |
+
+   Forcing `.load()` on all five stranded elements: **0 `ERR_FILE_NOT_FOUND`**, 0 media
+   `error` events, `element.error === null` on all five, all still at `readyState 4`, and
+   all five blob URLs re-fetched successfully (4.5 / 1.6 / 2.4 / 5.0 / 0.65 MB). The
+   console's last entry is the marker logged immediately before the forced load — nothing
+   after it.
+
+   The revisit at step 6 added only **one** element rather than two, and the network shows
+   **5 video fetches for 6 opens, all 200** — the cache is being hit, so reopening a
+   screening no longer refetches or makes a second copy of the bytes.
+
+   ### Still open: memory accumulation (lower priority)
+
+   **This fix addresses the reported crash and the console errors. It does not solve the
+   underlying memory growth**, and the counts above show why: the detached-element count
+   still climbs by roughly two per screening, and each abandoned element still pins a
+   decoded copy of its overlay. Five screenings held ~13.5 MB of video buffer that is not
+   released until the doctor leaves the patient screen. Holding the URLs alive means the
+   blobs are now deliberately retained for the life of the screen as well.
+
+   For a normal visit — open a patient, look at a handful of screenings, leave — this is
+   fine, and everything is released on unmount. A very long single session on one patient
+   would still grow.
+
+   The real fix is **option 3 from the investigation: stop using blob URLs for the overlay
+   entirely** and get the bytes to the player another way, which removes the abandoned
+   elements' hold on decoded video. That is a larger change to how the authed video source
+   works and is deliberately deferred; it is a known follow-up, not a regression.
 
    ### Ruled out by measurement (7 Sep)
 
