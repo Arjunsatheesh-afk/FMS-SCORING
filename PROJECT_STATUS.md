@@ -1,8 +1,13 @@
 # Project Status
 
-**Last updated:** 6 September 2026
+**Last updated:** 7 September 2026
 **Repo:** https://github.com/Arjunsatheesh-afk/FMS-SCORING.git
-**Branch:** `master` — in sync with `origin/master`, HEAD `b1492ac`
+**Branch:** `master` — in sync with `origin/master`, HEAD `b01a92b`
+
+> **Picking this up next?** Read section 13 item 7 first — the 6 Sep freeze is
+> investigated but **not reproduced**; the leading theory is a stale browser tab running
+> pre-fix code, so **hard-reload before the next multi-upload session**. Also note the
+> database is **not** empty (section 10).
 
 This file is written for someone with **no prior context**. It covers what the system
 does, every significant decision and why it was made, what has been validated and how,
@@ -51,8 +56,12 @@ first.** It is a Linux freeze and several pins do not have Windows wheels.
 
 ### Currently running (as of this writing)
 
-- Port **8000** — `analysis_server.py` (python, pid 11780)
-- Port **8085** — Expo dev server (node, pid 8188)
+- Port **8000** — `analysis_server.py`
+- Port **8085** — Expo dev server
+
+Both are started by hand (see the commands above); pids change every run, so check the
+ports rather than trusting any recorded pid. Note the launcher spawns a **parent/child
+python pair** for one server — two `python.exe` processes is normal, not a duplicate.
 
 ### Test accounts
 
@@ -62,8 +71,8 @@ Seeded by `seed_accounts.py`. Passwords follow the project convention
 | Role | Email | Password | Notes |
 |---|---|---|---|
 | Doctor | `priya.sharma@physio.example` | `9876543210.physio` | Created patients 2–4 |
-| Patient | `ramesh.kumar@example.com` | `9123456780.physio` | 1 screening on file |
-| Patient | `anita.rao@example.com` | `9988776655.physio` | 1 screening on file |
+| Patient | `ramesh.kumar@example.com` | `9123456780.physio` | No screenings |
+| Patient | `anita.rao@example.com` | `9988776655.physio` | **8 screenings** — the 6 Sep recording session, see section 10 |
 | Patient | `test.patient@example.com` | `9001112223.physio` | No screenings |
 
 ### Environment variables (all optional, defaults shown)
@@ -120,10 +129,16 @@ password hashes.
 
 ## 4. Git history
 
-Twelve commits, all pushed:
+Seventeen commits, all pushed:
 
 | SHA | Commit |
 |---|---|
+| `b01a92b` | Stop the recorder freezing mid-job or reusing the last test silently |
+| `dbff01c` | Add manual FMS score, and resolve the Final Score for bilateral tests |
+| `5620e99` | Score each side separately for ASLR and rotary stability |
+| `bf020a6` | Show pending checks as explained targets; score the ASLR resting leg |
+| `97bc455` | Keep "Rotary Stability" as the display name, keep "rotatory" as an alias |
+| `cd79d02` | Use the department's name "Rotatory Stability" in the UI *(reverted by `97bc455`)* |
 | `b1492ac` | Add doctor FMS report, threshold sourcing, and overlay cleanup |
 | `c2c0afb` | Add PROJECT_STATUS.md |
 | `636a206` | Fix gallery upload on web, and stale screening list after recording |
@@ -402,17 +417,35 @@ Patients **can** see who uploaded a screening (`uploadedByName`) — approved de
   unreachable**, so the logic survives if patient self-recording ever returns.
 - Synthetic test rows were cleared from the database at the time of this change.
 
-### Current database contents
+### Current database contents (as of 7 Sep 2026)
 
-4 users (1 doctor, 3 patients), **2 result rows**:
+**This is no longer a clean slate.** A live recording session on 6 Sep produced a complete
+seven-test screen on **Anita Rao**, with a manual score entered for every one. 4 users
+(1 doctor, 3 patients) and **8 result rows**, all on Anita; Ramesh Kumar and Test Patient
+have none.
 
-| id | job_id | patient | test | score |
-|---|---|---|---|---|
-| 7 | `46318302-…18890` | Ramesh Kumar | deep_squat | 3 |
-| 8 | `b9bf23e6-…743a1ad` | Anita Rao | deep_squat | 1 |
+| row | test | auto | manual | sideCoverage | declaredSide |
+|---|---|---|---|---|---|
+| 36 | deep_squat | 1 | 1 | `unknown` | — |
+| 37 | hurdle_step | 3 | 2 | `single` | **left** |
+| 38 | hurdle_step | 3 | 2 | `single` | **right** |
+| 39 | inline_lunge | 3 | 3 | `both` | — |
+| 40 | shoulder_mobility | 3 | 2 | `internal` | — |
+| 41 | active_straight_leg_raise | 2 | 2 | `both` | — |
+| 42 | trunk_stability_pushup | 3 | 2 | `unknown` | — |
+| 43 | rotary_stability | 3 | 2 | `split` | — |
 
-Ramesh had 4 Deep Squat screenings; ids 4/5/6 were deleted keeping the most recent (id 7),
-verified in the browser as "Screenings (1)".
+8 overlay videos on disk, one per row. **Do not assume an empty database** when picking up
+this project — clear it deliberately if a clean slate is wanted.
+
+Worth reading as data rather than just state: **automated and manual agree on 3 of 8**, and
+**every disagreement runs the same way — automated one point higher, never lower.** That is
+the same over-scoring pattern the reference set showed, now reproduced on live footage by a
+clinician entering scores independently.
+
+The two hurdle step rows are the department's separate left/right files, each with the side
+declared at upload — the first real use of that path, and both resolved to
+`sideCoverage='single'` as designed.
 
 **Housekeeping — done 5 Sep 2026.** `fms_outputs/api/annotated/` had 5 `.mp4` files
 against 2 result rows. The three orphans (`42569971-…f081d29c`, `4c0e9ba1-…4bf0c1d836`,
@@ -706,6 +739,34 @@ independently finds both sides, the result carries `declarationConflict: true` a
 both sides; using your declared single-side selection anyway."* The declaration is still
 what was used; the disagreement simply is not silent.
 
+### Recorder reliability (`b01a92b`, 6 Sep 2026)
+
+Three faults let a hurdle step video be scored against deep squat rules with nothing on
+screen to signal it, and made a finished job look stuck:
+
+- **Polling lived in a `useRef` that an unrelated effect's cleanup cleared.** That effect
+  depended on `loadExercises`, a `useCallback` over `selectedExercise`, so **touching the
+  test picker mid-job tore down polling** — the job kept running server-side while the bar
+  froze wherever the last poll landed. Polling now has its own effect keyed on the job id.
+- **On completion the recorder navigated away immediately**, so the completed state never
+  rendered. A finished job now stays on screen: *Completed* badge, the test it was actually
+  submitted as, bar held at 100%, score, fault count, and a button to move on.
+- **The test picker had a default.** It now starts unselected, uploads are disabled until a
+  test is chosen, and both pickers reset after a successful upload — cleared only on
+  success, so a failed upload keeps the selection for a retry.
+
+**Verified two ways.** Automated: one video per FMS test uploaded through the API, all
+seven scored against the requested test, with every fault belonging to that test's own
+declared fault set — a mis-routed video would violate that. The gallery picker itself could
+not be driven under automation (expo's web implementation needs user activation a
+synthesised click does not confer), so that hop was left unproven at the time.
+
+**That gap is now closed by the live recording session of 6 Sep.** Five screenings were
+uploaded through the real gallery picker — Shoulder Mobility, Inline Lunge, Hurdle Step
+(left and right), Deep Squat — and each completed with the **correct test label and a real
+score**, including two with the side declared. See section 10 for the resulting rows. The
+silent-default failure did not recur.
+
 ### ASLR: resting-leg hip flexion is now a real check
 
 The one pending item that was measurable today — sagittal view, both hip angles already
@@ -807,16 +868,92 @@ once the department signs the numbers off — that is when the distinction start
 
 ### Known technical debt
 
-7. **Push-up thresholds need recalibration.** No check fires on any of 18 subjects
+7. **App froze during a multi-upload session — INVESTIGATED, NOT REPRODUCED.**
+
+   **What happened (6 Sep 2026).** Over roughly 20-30 minutes the doctor uploaded 7-8
+   videos one after another, 3-4 minutes apart, changing the test picker between each. The
+   app froze partway through the sequence, and the console showed repeated
+   `Failed to load resource: net::ERR_FILE_NOT_FOUND` for `blob:` URLs.
+
+   It is **not** triggered by any single action - an early guess that entering a manual
+   score caused it was wrong. The shape of the report points at something accumulating
+   across a session.
+
+   ### Ruled out by measurement (7 Sep)
+
+   `URL.createObjectURL` / `revokeObjectURL` were instrumented and ~14 open/close cycles
+   run across all 8 screenings, including deliberate rapid switching while blob loads were
+   still in flight:
+
+   | | created | revoked | live | heap |
+   |---|---|---|---|---|
+   | start | 0 | 0 | 0 | 21.5 MB |
+   | after 1 open | 1 | 0 | 1 | 23.4 MB |
+   | after close | 1 | 1 | **0** | 23.8 MB |
+   | after 8 cycles | 8 | 8 | **0** | 23.7 MB |
+   | after rapid switching | 10 | 9 | **1** (the open row) | 23.9 MB |
+
+   - **Blob URLs are properly revoked.** No leak. `use-authed-video-source.ts` revokes on
+     close and on source change; the single live blob at the end is the open screening.
+   - **Heap is flat.** 21.5 -> 23.9 MB across the whole run, and it *fell* from 25.0 to
+     23.7 mid-run when GC ran. Video elements return to zero after each close.
+   - **`ERR_FILE_NOT_FOUND` did not reproduce.** Zero console errors throughout, including
+     under switching designed to strand a player on a revoked URL.
+
+   The gap: this exercised **viewing**, not **uploading**. A faithful reproduction needs
+   7-8 real uploads with picker changes between them, which could not be driven under
+   automation (expo's web file picker needs user activation a synthesised click does not
+   confer).
+
+   ### Leading theory - the browser may have been running the OLD recorder
+
+   The `b01a92b` fix was committed at 07:18 UTC and the first screening was created at
+   07:24 UTC, which looks like the session ran post-fix. **That only proves the files
+   changed, not that the browser had the new code.** If the tab had been open since before
+   the fix and Metro's hot reload did not apply - or it was never hard-reloaded - the
+   session would have run the **pre-fix recorder**, which had this confirmed bug:
+
+   > the polling interval lived in a `useRef` cleared by the cleanup of an effect keyed on
+   > `loadExercises`, itself a `useCallback` over `selectedExercise` - so **changing the
+   > test picker while a job was running tore down polling**. The job continued
+   > server-side while the progress bar froze wherever the last poll landed.
+
+   The doctor changed the picker between every upload. That fits "froze partway through a
+   sequence of uploads" far better than anything reproducible in the current code. It
+   cannot be tested now because the code is fixed.
+
+   ### Real defect found, but a weak fit (fixed 7 Sep)
+
+   `addSession` was an inline arrow inside a `useMemo` keyed on `[history, ...]`, so its
+   identity changed whenever history did - and the fixed recorder's polling effect lists it
+   as a dependency, meaning the interval was torn down and recreated with a fresh 1.5s
+   clock on every history change. It is now a stable `useCallback` with no dependencies.
+
+   **Honest caveat:** `history` only changes on completion, when polling stops anyway, so
+   this is a latent bug rather than a demonstrated cause of the freeze. Fixed because it is
+   cheap and clearly wrong, not because it explains the symptom.
+
+   ### Next step for whoever picks this up
+
+   1. **Hard-reload the browser** (Ctrl+Shift+R) before the next multi-upload session, so
+      the running code is certainly the committed code.
+   2. If the freeze **does not** recur, the stale-tab theory above is the likely
+      explanation and this item can close.
+   3. If it **does** recur, capture at the exact moment: a **console screenshot**, and
+      whether the progress bar was **mid-job or at 100%**. That single detail separates a
+      dead poll (bar stuck below 100%, job completes server-side) from a stranded video
+      player (bar at 100%, blob errors) - the two remaining candidates.
+
+8. **Push-up thresholds need recalibration.** No check fires on any of 18 subjects
    (section 8). Both a threshold problem and a missing-criterion problem — hand position
    is not measured.
 
-8. **`requirements.txt` is not usable on Windows as-is.** It is a Linux freeze including
+9. **`requirements.txt` is not usable on Windows as-is.** It is a Linux freeze including
    `triton==3.6.0` and the full `nvidia-*-cu12` wheel set, which have no Windows wheels.
    The working `.venv/` was assembled by hand. Splitting this into a real
    `requirements-win.txt` is unfinished work.
 
-9. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
+10. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
    **24 tests** with the threshold, side-splitting and declared-side work (section 12), which now guard the declared
    thresholds against the scoring code and asserts that pending checks can never be
    evaluated. Still missing: per-fault behavioural coverage for
@@ -824,10 +961,10 @@ once the department signs the numbers off — that is when the distinction start
    nothing at all covers `analysis_server.py` or `auth_store.py`, both of which have been
    verified only by driving a running server by hand.
 
-10. **README does not document the auth system or roles.** It was updated for the
+11. **README does not document the auth system or roles.** It was updated for the
     camera-angle fix (`61d300e`) but not for anything after `a4634d6`.
 
-11. **Deep Squat's `trunk_leans_forward` should be formally moved to `notAssessed`** — it
+12. **Deep Squat's `trunk_leans_forward` should be formally moved to `notAssessed`** — it
     cannot fire on frontal footage (section 7).
 
 ---

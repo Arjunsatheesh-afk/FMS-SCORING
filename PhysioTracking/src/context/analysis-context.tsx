@@ -73,18 +73,31 @@ export function AnalysisProvider({ children }: PropsWithChildren) {
     void refresh();
   }, [status, refresh]);
 
+  /**
+   * Shows the just-finished screening immediately; the next refresh replaces
+   * it with the stored row.
+   *
+   * Deliberately a stable useCallback rather than an inline arrow in the memo
+   * below. Defined inline it took a new identity on every `history` change,
+   * and the recorder's polling effect lists it as a dependency - so the poll
+   * interval was torn down and recreated with a fresh 1.5s clock whenever
+   * history moved. A functional update needs no dependencies, so this is safe
+   * to hold constant.
+   */
+  const addSession = useCallback((session: SessionSummary) => {
+    setHistory((prev) => [session, ...prev]);
+  }, []);
+
   const value = useMemo<AnalysisContextValue>(
     () => ({
       latestSession: history[0] ?? null,
       history,
-      // Shows the just-finished screening immediately; the next refresh
-      // replaces it with the stored row.
-      addSession: (session) => setHistory((prev) => [session, ...prev]),
+      addSession,
       refresh,
       isHydrated,
       error,
     }),
-    [history, refresh, isHydrated, error],
+    [history, addSession, refresh, isHydrated, error],
   );
 
   return <AnalysisContext.Provider value={value}>{children}</AnalysisContext.Provider>;
