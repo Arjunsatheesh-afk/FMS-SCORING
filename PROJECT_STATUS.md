@@ -4,10 +4,10 @@
 **Repo:** https://github.com/Arjunsatheesh-afk/FMS-SCORING.git
 **Branch:** `master` — in sync with `origin/master`, HEAD `b01a92b`
 
-> **Picking this up next?** Read section 13 item 7 first — the 6 Sep freeze is
-> investigated but **not reproduced**; the leading theory is a stale browser tab running
-> pre-fix code, so **hard-reload before the next multi-upload session**. Also note the
-> database is **not** empty (section 10).
+> **Picking this up next?** Section 13 item 7: the 6 Sep freeze now has a **confirmed root
+> cause** (accumulated expo-video players stranding revoked blob URLs) and a fix that is
+> **not yet verified at runtime** — restart Metro, hard-reload, and re-run the measurement
+> recorded there. Also note the database is **not** empty (section 10).
 
 This file is written for someone with **no prior context**. It covers what the system
 does, every significant decision and why it was made, what has been validated and how,
@@ -868,7 +868,7 @@ once the department signs the numbers off — that is when the distinction start
 
 ### Known technical debt
 
-7. **App froze during a multi-upload session — INVESTIGATED, NOT REPRODUCED.**
+7. **App froze during a multi-upload session — ROOT CAUSE CONFIRMED, fix unverified.**
 
    **What happened (6 Sep 2026).** Over roughly 20-30 minutes the doctor uploaded 7-8
    videos one after another, 3-4 minutes apart, changing the test picker between each. The
@@ -878,6 +878,51 @@ once the department signs the numbers off — that is when the distinction start
    It is **not** triggered by any single action - an early guess that entering a manual
    score caused it was wrong. The shape of the report points at something accumulating
    across a session.
+
+   ### ROOT CAUSE — confirmed 7 Sep, reproduced on demand
+
+   **`useVideoPlayer` was given a changing source.** expo-video creates a new player per
+   source change and only releases players **on unmount**, so every screening viewed left a
+   live player behind, each owning a detached `<video>` element still referencing its blob
+   URL. `use-authed-video-source.ts` revokes the old URL correctly when the source changes,
+   which strands every one of those players.
+
+   Measured, opening four screenings on Anita Rao:
+
+   | | value |
+   |---|---|
+   | video elements ever created | **8** (two per screening opened) |
+   | attached | 1 |
+   | **detached** | **7** |
+   | detached elements holding a blob URL | **4** — one per screening viewed |
+
+   All sat at `readyState 4`, fully buffered, which is why nothing failed until something
+   made them reload. Calling `.load()` on the three stranded ones produced **exactly three
+   simultaneous `Failed to load resource: net::ERR_FILE_NOT_FOUND`** — the reported
+   signature, scaled: five screenings viewed gives five errors at once.
+
+   This also explains the freeze: each stranded element pins a fully decoded 2-4 MB overlay
+   in memory, growing with every screening viewed.
+
+   **Why the 7 Sep testing missed it:** it counted `document.querySelectorAll('video')`,
+   which sees only *attached* elements, and JS heap, which does not include media buffers.
+   Both looked clean while seven detached elements accumulated.
+
+   ### Fix applied — NOT YET VERIFIED AT RUNTIME
+
+   `patients/[id].tsx` now creates the player **once** with `useVideoPlayer(null)` and
+   re-points it with `player.replaceAsync(source)` / `replace(null)` in an effect, which is
+   the documented way to change source. Typechecks clean.
+
+   **It could not be verified at runtime:** Metro kept serving a stale bundle
+   (`ReferenceError: useEffect is not defined` from a pre-edit version), so every
+   post-fix measurement re-ran the old code. **Next session must restart the Expo dev
+   server, hard-reload, then repeat the measurement above** — the expected result is
+   `detached elements holding a blob URL: 0` however many screenings are opened, and no
+   errors when `.load()` is forced.
+
+   *Incidental corroboration:* Metro serving a stale bundle was observed directly here,
+   which is the same mechanism as the stale-tab theory below.
 
    ### Ruled out by measurement (7 Sep)
 

@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -106,7 +106,28 @@ export default function PatientDetailScreen() {
     videoUrl,
     token,
   );
-  const player = useVideoPlayer(videoSource);
+  // Created ONCE with no source, then re-pointed via replace().
+  //
+  // Passing a changing source straight to useVideoPlayer made a new player on
+  // every change, and expo-video only releases a player when the component
+  // unmounts - so each screening viewed left a live player behind, holding a
+  // detached <video> element that still referenced its blob URL. The hook that
+  // supplies the source revokes the old URL correctly, which strands every one
+  // of those players: anything that makes them reload fires one
+  // ERR_FILE_NOT_FOUND per screening ever viewed, all at once, and each also
+  // pins a fully buffered copy of the overlay in memory.
+  const player = useVideoPlayer(null);
+
+  useEffect(() => {
+    if (!player) return;
+    // replaceAsync keeps asset loading off the UI thread; replace(null) on
+    // teardown drops the reference so the element is not left holding a blob.
+    if (videoSource) {
+      void player.replaceAsync(videoSource);
+    } else {
+      player.replace(null);
+    }
+  }, [player, videoSource]);
 
   // The overlay is rendered at the source footage's own shape, which for these
   // screenings is portrait. A fixed 16:9 box padded that into a mostly-black
