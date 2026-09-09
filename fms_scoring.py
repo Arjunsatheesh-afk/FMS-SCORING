@@ -308,10 +308,38 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
         ),
     ),
     "trunk_stability_pushup": (
-        Check("pushup_range", "range", "elbowAngle", "gt", 135.0, "°", "insufficient_pushup_range"),
-        Check("body_line", "body line", "bodyLineErrorNorm", "gt", 0.12, "body", "trunk_extension_or_sag"),
-        Check("knee_flexion", "knees", "kneeAngle", "lt", 150.0, "°", "knee_flexion"),
+        Check(
+            "pushup_range",
+            "range",
+            "peakElbowExtensionAngle",
+            "lt",
+            145.0,
+            "°",
+            "insufficient_pushup_range",
+        ),
+        Check(
+            "body_line",
+            "body line",
+            "supportBodyLineErrorNorm",
+            "gt",
+            0.11,
+            "body",
+            "trunk_extension_or_sag",
+        ),
+        Check("knee_flexion", "knees", "supportMinKneeAngle", "lt", 136.0, "°", "knee_flexion"),
         Check("complete_elbow", "completion", "elbowAngle", "gt", 160.0, "°"),
+        Check(
+            "hand_position",
+            "starting hand position",
+            pending=True,
+            target_text="thumbs at the top of the forehead (3) or at the chin (2); "
+            "for women, chin (3) or clavicle (2)",
+            reason="COCO-17 has no thumb, chin or forehead landmark — the whole head spans "
+            "0.032 torso lengths along the body axis (nose-to-ear, measured), while the "
+            "wrist-to-head measurement varies by 0.16 within a single clip, ~5x that ruler. "
+            "No reference clip records the hand position used, so there is nothing to "
+            "calibrate against either.",
+        ),
     ),
     "rotary_stability": (
         Check("elbow_knee_touch", "touch", "elbowKneeDistanceNorm", "gt", 0.40, "limb", "fail_to_touch_elbow_to_knee"),
@@ -356,6 +384,27 @@ _SPLIT_DEADBAND = 0.12  # |signal| below this is ambiguous, so it votes for neit
 _SPLIT_MIN_BLOCK = 0.10 # a phase must cover this share of the clip to count
 _SPLIT_MIN_CONF = 0.25  # a signal confident on less than this is unusable
 _SPLIT_MIN_FRAMES = 5   # the scorer's own minimum for a scoreable attempt
+
+
+# --------------------------------------------------------------------------
+# Trunk stability push-up: the support phase
+#
+# The two body faults this test names - "body lifts as a unit", "knees stay
+# extended" - are faults of the SUPPORT phase, when the subject is up off the
+# floor. Judging them at the bottom of the press, which is what the scorer used
+# to do, samples the one instant where neither can show: the chest is near the
+# floor, so the body is straight by construction. That is why body-line error
+# read 0.0003-0.051 against a 0.12 threshold and no check fired on any of the
+# 18 reference subjects.
+#
+# Support phase = elbows extended past this angle. Reference clips spend 28-59%
+# of their frames there, and they contain several reps each, so one chosen
+# frame was never sampling a consistent moment either - the deepest point of
+# the press lands anywhere from 0% to 100% through a clip.
+# --------------------------------------------------------------------------
+
+_PUSHUP_SUPPORT_ELBOW = 140.0
+_PUSHUP_SMOOTH = 9      # median filter width, frames
 
 
 def _aslr_side_signal(frame: FMSFrame) -> float | None:
@@ -1146,18 +1195,56 @@ class FMSScorer:
         )
 
     def _score_trunk_stability_pushup(self, frames: list[FMSFrame]) -> dict[str, Any]:
-        frame = min(frames, key=lambda item: _avg_angle(item, ["left_elbow_angle", "right_elbow_angle"], 180))
+        # Every series is median-filtered before anything is read off it. The
+        # body faults are judged over the support phase rather than at one
+        # frame, so a transient matters less than a sustained posture - and the
+        # difference is real: one reference subject peaks at 0.203 body-line
+        # error during a transition while sitting at 0.050 throughout the
+        # support phase itself.
+        elbows = _median_filter(
+            [_avg_angle(f, ["left_elbow_angle", "right_elbow_angle"], 180) for f in frames],
+            _PUSHUP_SMOOTH,
+        )
+        bodies = _median_filter([_body_line_error(f) for f in frames], _PUSHUP_SMOOTH)
+        knees = _median_filter(
+            [_avg_angle(f, ["left_knee_angle", "right_knee_angle"], 180) for f in frames],
+            _PUSHUP_SMOOTH,
+        )
+
+        elbow_values = [v for v in elbows if v is not None]
+        # The bottom of the press still names the frame the report points at,
+        # and still answers "did they lower at all" for the completion gate.
+        bottom_index = min(range(len(elbows)), key=lambda i: (elbows[i] is None, elbows[i]))
+        frame = frames[bottom_index]
+        elbow_angle = elbows[bottom_index] if elbows[bottom_index] is not None else 180.0
+        peak_extension = max(elbow_values) if elbow_values else 180.0
+
+        support = [
+            i
+            for i, elbow in enumerate(elbows)
+            if elbow is not None and elbow >= _PUSHUP_SUPPORT_ELBOW
+        ]
+        support_body = [bodies[i] for i in support if bodies[i] is not None]
+        support_knee = [knees[i] for i in support if knees[i] is not None]
+
+        # Median for the trunk, 5th percentile for the knees, and the asymmetry
+        # is deliberate. Sag or extension is a posture held across the lift, so
+        # the middle of the distribution is the honest summary. A knee bend is
+        # an event within it: the labelled knee-flexion clip spends 10% of its
+        # support phase below the threshold and sits at a normal 159 degrees
+        # median, so a median would miss it entirely.
+        body_line = float(np.median(support_body)) if support_body else None
+        min_knee = float(np.percentile(support_knee, 5)) if support_knee else None
+
         shoulder_y = _mean_y(frame, ["left_shoulder", "right_shoulder"])
         hip_y = _mean_y(frame, ["left_hip", "right_hip"])
         ankle_y = _mean_y(frame, ["left_ankle", "right_ankle"])
-        body_sag = _body_line_error(frame)
-        elbow_angle = _avg_angle(frame, ["left_elbow_angle", "right_elbow_angle"], 180)
-        knee_angle = _avg_angle(frame, ["left_knee_angle", "right_knee_angle"], 180)
 
         values = {
             "elbowAngle": elbow_angle,
-            "bodyLineErrorNorm": body_sag,
-            "kneeAngle": knee_angle,
+            "peakElbowExtensionAngle": peak_extension,
+            "supportBodyLineErrorNorm": body_line,
+            "supportMinKneeAngle": min_knee,
         }
 
         faults = []
@@ -1170,21 +1257,28 @@ class FMSScorer:
 
         # The completion gate is the declared elbow threshold plus a landmark
         # presence requirement, which is not a threshold and so stays here.
+        # A clip with no support phase at all never got off the floor.
         complete = (
             shoulder_y is not None
             and hip_y is not None
             and ankle_y is not None
+            and bool(support)
             and not _incomplete("trunk_stability_pushup", values)
         )
+        measurements: dict[str, Any] = {
+            "elbowAngle": round(elbow_angle, 2),
+            "peakElbowExtensionAngle": round(peak_extension, 2),
+            "scoredFrame": frame.frame,
+            "notAssessed": ["hand_position"],
+        }
+        if body_line is not None:
+            measurements["supportBodyLineErrorNorm"] = round(body_line, 3)
+        if min_knee is not None:
+            measurements["supportMinKneeAngle"] = round(min_knee, 2)
         return _score_from_faults(
             faults,
             bool(complete),
-            {
-                "bodyLineErrorNorm": round(body_sag, 3),
-                "elbowAngle": round(elbow_angle, 2),
-                "kneeAngle": round(knee_angle, 2),
-                "scoredFrame": frame.frame,
-            },
+            measurements,
             confidence=_attempt_confidence(frames),
         )
 

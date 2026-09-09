@@ -144,9 +144,18 @@ export const MEASUREMENT_SPEC: Record<FmsTestId, MeasurementSpec[]> = {
     { key: 'raisedSide', label: 'Raised side' },
   ],
   trunk_stability_pushup: [
-    { key: 'elbowAngle', label: 'Elbow angle', unit: '°', decimals: 1 },
-    { key: 'kneeAngle', label: 'Knee angle', unit: '°', decimals: 1 },
-    { key: 'bodyLineErrorNorm', label: 'Body-line error', unit: 'body', decimals: 3 },
+    // Labels say which moment each number comes from. The two body measures
+    // are summaries of the support phase, not readings at one instant, and a
+    // clinician comparing them against a threshold needs to know that.
+    { key: 'peakElbowExtensionAngle', label: 'Peak elbow extension', unit: '°', decimals: 1 },
+    { key: 'elbowAngle', label: 'Elbow angle at lowest point', unit: '°', decimals: 1 },
+    { key: 'supportMinKneeAngle', label: 'Lowest knee angle in support', unit: '°', decimals: 1 },
+    {
+      key: 'supportBodyLineErrorNorm',
+      label: 'Body-line error in support',
+      unit: 'body',
+      decimals: 3,
+    },
   ],
   rotary_stability: [
     { key: 'elbowKneeDistanceNorm', label: 'Elbow-to-knee gap', unit: 'limb', decimals: 3 },

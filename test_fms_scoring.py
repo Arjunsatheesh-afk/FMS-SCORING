@@ -276,7 +276,12 @@ class ThresholdDeclarationTests(unittest.TestCase):
                 "oppositeKneeAngle",
                 "oppositeHipAngle",
             },
-            "trunk_stability_pushup": {"elbowAngle", "kneeAngle", "bodyLineErrorNorm"},
+            "trunk_stability_pushup": {
+                "elbowAngle",
+                "peakElbowExtensionAngle",
+                "supportMinKneeAngle",
+                "supportBodyLineErrorNorm",
+            },
             "rotary_stability": {"elbowKneeDistanceNorm"},
         }
         for test_id, checks in THRESHOLDS.items():
@@ -474,6 +479,102 @@ class ThresholdBehaviourTests(unittest.TestCase):
         )
         self.assertEqual(fms_scoring._score_shoulder_distance(12.0, 8.0), 2)
         self.assertEqual(fms_scoring._score_shoulder_distance(12.1, 8.0), 1)
+
+
+def pushup_frames(bottom_overrides=None, support_overrides=None, count=30):
+    """A push-up with a clear bottom phase and a clear support phase.
+
+    Overrides are applied to one phase only, which is the whole point: the body
+    faults are judged over the support phase, so the same posture fault placed
+    at the bottom must not fire.
+    """
+    frames = []
+    for index in range(count * 2):
+        in_support = index >= count
+        overrides = (support_overrides if in_support else bottom_overrides) or {}
+        frame = make_frame(dict(overrides.get("points", {})), frame=index)
+        frame.angles["left_elbow_angle"] = frame.angles["right_elbow_angle"] = (
+            170.0 if in_support else 60.0
+        )
+        knee = overrides.get("knee", 175.0)
+        frame.angles["left_knee_angle"] = frame.angles["right_knee_angle"] = knee
+        frames.append(frame)
+    return frames
+
+
+# Hips pushed sideways of the shoulder-ankle line by enough to clear the 0.11
+# body-line threshold: the error is |shoulder_x - hip_x| / 200 here, so a 45px
+# offset reads 0.225.
+PIKED_HIPS = {"points": {"left_hip": (130, 130), "right_hip": (160, 130)}}
+
+
+class TrunkStabilityPushupTests(unittest.TestCase):
+    """The recalibrated push-up: faults are judged over the support phase.
+
+    Before this, all three checks were evaluated at the deepest point of the
+    press - the one instant where sag and knee flexion cannot show, because the
+    chest is near the floor and the body is straight by construction. No check
+    fired on any of the 18 reference subjects.
+    """
+
+    def score(self, frames):
+        return FMSScorer().score("trunk_stability_pushup", frames)
+
+    def check(self, key):
+        return next(c for c in checks_for("trunk_stability_pushup") if c.key == key)
+
+    def test_clean_pushup_scores_three(self):
+        result = self.score(pushup_frames())
+        self.assertEqual(result["score"], 3)
+        self.assertEqual(result["faults"], [])
+
+    def test_knee_flexion_in_support_fires(self):
+        frames = pushup_frames()
+        for frame in frames[30:45]:
+            frame.angles["left_knee_angle"] = frame.angles["right_knee_angle"] = 120.0
+        result = self.score(frames)
+        self.assertIn("knee_flexion", result["faults"])
+        self.assertEqual(result["score"], 2)
+
+    def test_knee_flexion_only_at_the_bottom_does_not_fire(self):
+        """The old bug, pinned: bending the knees off the floor is not the fault."""
+        frames = pushup_frames()
+        for frame in frames[:15]:
+            frame.angles["left_knee_angle"] = frame.angles["right_knee_angle"] = 120.0
+        result = self.score(frames)
+        self.assertNotIn("knee_flexion", result["faults"])
+        self.assertEqual(result["score"], 3)
+
+    def test_sag_in_support_fires(self):
+        result = self.score(pushup_frames(support_overrides=PIKED_HIPS))
+        self.assertIn("trunk_extension_or_sag", result["faults"])
+        self.assertGreater(
+            result["measurements"]["supportBodyLineErrorNorm"],
+            self.check("body_line").value,
+        )
+
+    def test_sag_only_at_the_bottom_does_not_fire(self):
+        result = self.score(pushup_frames(bottom_overrides=PIKED_HIPS))
+        self.assertNotIn("trunk_extension_or_sag", result["faults"])
+
+    def test_range_is_peak_extension_not_depth(self):
+        """Going down far is not the criterion; pressing back up is."""
+        frames = pushup_frames()
+        for frame in frames[30:]:
+            frame.angles["left_elbow_angle"] = frame.angles["right_elbow_angle"] = 141.0
+        result = self.score(frames)
+        self.assertIn("insufficient_pushup_range", result["faults"])
+        self.assertLess(
+            result["measurements"]["peakElbowExtensionAngle"],
+            self.check("pushup_range").value,
+        )
+
+    def test_hand_position_is_pending_and_carries_a_reason(self):
+        check = self.check("hand_position")
+        self.assertEqual(check.kind, "pending")
+        self.assertIsNone(check.measurement, "a pending check must expose no number")
+        self.assertTrue(check.reason)
+        self.assertIn("hand_position", self.score(pushup_frames())["measurements"]["notAssessed"])
 
 
 if __name__ == "__main__":
