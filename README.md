@@ -39,10 +39,24 @@ Data Collection → Model Training → Real-time Classification
 cd PhysiotherapyProject
 ```
 
-2. Install dependencies:
+2. Install dependencies. All three steps are required — see the header of
+   `requirements.txt` for why the second one exists:
 ```bash
 pip install -r requirements.txt
+pip uninstall -y onnxruntime
+pip install --force-reinstall --no-deps onnxruntime-gpu==1.24.4
 ```
+   Then confirm the right package won, because this failure is silent:
+```bash
+python -c "import onnxruntime as o; print(o.__version__)"
+```
+   Expect `1.24.4`; `1.29.0` means the second step did not happen. Note that
+   `get_available_providers()` is *not* a valid GPU check — it lists providers compiled in,
+   not ones that can load. For a real end-to-end check use the pipeline's own entry point:
+```bash
+python -c "from fms_pipeline import build_detector, _detector_session_providers; d, dev = build_detector('balanced', 'cuda'); print(dev, _detector_session_providers(d))"
+```
+   Windows and Linux (x86_64) are both supported by the one file; macOS is not.
 
 ## Pipeline Overview
 
@@ -523,6 +537,8 @@ Valid test ids: `deep_squat`, `hurdle_step`, `inline_lunge`,
 ```bash
 cd /home/user/Exercise_Tracking_and_Analysis
 pip install -r requirements.txt
+pip uninstall -y onnxruntime
+pip install --force-reinstall --no-deps onnxruntime-gpu==1.24.4
 python analysis_server.py
 ```
 

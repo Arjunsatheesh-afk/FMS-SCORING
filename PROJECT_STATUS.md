@@ -51,8 +51,10 @@ The Python environment lives in `.venv/` at the repo root (~6.2 GB, gitignored).
 cd PhysioTracking && npm install && npx expo start --web --port 8085
 ```
 
-**Do not rebuild the venv from `requirements.txt` on Windows without reading section 13
-first.** It is a Linux freeze and several pins do not have Windows wheels.
+Rebuilding the venv from `requirements.txt` works on Windows as of 10 Sep 2026, but
+**follow all three install steps in that file's header**, not just `pip install -r`. The
+second step removes a CPU `onnxruntime` that pip pulls in as a transitive dependency and
+which silently costs you CUDA. Section 13 item 9 has the full account.
 
 ### Currently running (as of this writing)
 
@@ -100,7 +102,7 @@ auth_store.py             SQLite: users, tokens, results. All SQL is here.
 annotate_video.py         Skeleton-overlay renderer (reads cached keypoints, no detector).
 run_all_samples.py        Batch runner over the Dataset/ folder tree.
 seed_accounts.py          Creates the doctor + demo patients.
-test_fms_scoring.py       24 tests: the threshold table guarded against the
+test_fms_scoring.py       31 tests: the threshold table guarded against the
                           scoring code, side splitting, and the declared-side
                           rules. See section 13.
 
@@ -271,6 +273,7 @@ app under *"Not assessed from this view"*:
 | Inline Lunge | `knee_alignment_compensation`, `balance_or_pelvis_shift` | Both frontal-plane quantities; test is filmed sagittally. |
 | Active Straight-Leg Raise | `pelvis_lift_or_rotation` | Subject is supine and filmed from the side, so the pelvis L–R axis points at the camera. Obliquity cannot be separated from rotation. |
 | Rotary Stability | `shoulder_or_pelvis_rotation`, `shoulder_lowering` | Both derive from transverse-segment tilt, unrecoverable from the sagittal view. The elbow-to-knee touch is kept because that movement happens in the plane the camera sees. |
+| Trunk Stability Push-Up | `hand_position` | **Not a camera-angle casualty — a landmark-resolution one**, and the only pending check of that kind. COCO-17 has no thumb, chin or forehead point; the whole head spans 0.032 torso lengths along the body axis, while the wrist-to-head measure varies by ~0.16 within one clip. This is the clinical 3-vs-2 criterion, so its absence caps what the push-up score can distinguish. See §13 item 8. |
 
 **Consequence, and it matters:** a dropped check can only push a score *up*, never down.
 Inline Lunge and Rotary Stability therefore read high. The app marks both as
@@ -312,12 +315,20 @@ Score distribution:
 
 ### Findings from this distribution that need attention
 
-1. **The push-up test is inert.** No check has ever fired; all 18 score 3. Elbow angles
-   reach 72° against a `> 135°` threshold; body-line error reaches 0.051 against `> 0.12`;
-   knees never drop below 158.5° against `< 150°`. The logic is sound — an earlier claim
-   that `elbow_angle > 135` was "essentially unfireable" was **wrong** and was corrected:
-   it simply never triggers on this cohort. Also, the clinical 3-vs-2 criterion for this
-   test is **hand position**, which is not measured at all.
+1. ~~**The push-up test is inert.**~~ **FIXED 9 Sep 2026 — see §13 item 8.** The numbers
+   below are the pre-fix state and are kept because they are what the fix was diagnosed
+   from. No check had ever fired; all 18 scored 3. Elbow angles reached 72° against a
+   `> 135°` threshold; body-line error reached 0.051 against `> 0.12`; knees never dropped
+   below 158.5° against `< 150°`.
+
+   The reading recorded here — "the logic is sound, it simply never triggers on this
+   cohort" — turned out to be **wrong**, and the row above is stale as a result. Two of the
+   three checks were being evaluated at the deepest point of the press, where sag and knee
+   flexion cannot physically show, and the elbow check measured descent when the criterion
+   is extension. Judged over the support phase instead, the push-up distribution is
+   `{2: 4, 3: 17}` and both labelled fault clips are caught. The clinical 3-vs-2 criterion
+   is still **hand position**, which is now a registered pending check — measurable in
+   principle, but not to the precision it needs.
 2. **Inline Lunge is near-uninformative.** Two of four checks dropped, and the depth check
    (`> 125°`) never fires because observed knee angles top out at 87.5°. Scores rest on
    trunk lean alone.
@@ -1043,17 +1054,118 @@ once the department signs the numbers off — that is when the distinction start
       dead poll (bar stuck below 100%, job completes server-side) from a stranded video
       player (bar at 100%, blob errors) - the two remaining candidates.
 
-8. **Push-up thresholds need recalibration.** No check fires on any of 18 subjects
-   (section 8). Both a threshold problem and a missing-criterion problem — hand position
-   is not measured.
+8. ~~**Push-up thresholds need recalibration.**~~ **DONE 9 Sep 2026 for the fault checks;
+   hand position stays pending.**
 
-9. **`requirements.txt` is not usable on Windows as-is.** It is a Linux freeze including
-   `triton==3.6.0` and the full `nvidia-*-cu12` wheel set, which have no Windows wheels.
-   The working `.venv/` was assembled by hand. Splitting this into a real
-   `requirements-win.txt` is unfinished work.
+   The diagnosis in the original entry was wrong in an instructive way. It read as a
+   threshold problem, and it was mostly a **wrong-frame** problem: all three checks were
+   evaluated at the deepest point of the press — the one instant where sag and knee
+   flexion cannot show, because the chest is near the floor and the body is straight by
+   construction. Body-line error read 0.0003–0.051 against a 0.12 threshold for exactly
+   that reason. The elbow check was worse than mis-set: it measured the *minimum* elbow
+   angle, i.e. how far the subject went **down**, when the FMS criterion is whether they
+   pressed **up**. And the clips contain several reps each, so the single chosen frame
+   landed anywhere from 0% to 100% through the clip.
+
+   Faults are now judged over the **support phase** — frames with elbow ≥ 140°, 28–59% of
+   each clip — on 9-frame median-filtered series:
+
+   | check | was | now |
+   |---|---|---|
+   | body line | `bodyLineErrorNorm > 0.12` at the bottom frame | `supportBodyLineErrorNorm > 0.11`, **median** over support |
+   | knees | `kneeAngle < 150` at the bottom frame | `supportMinKneeAngle < 136`, **5th percentile** over support |
+   | range | `elbowAngle > 135` (minimum = depth) | `peakElbowExtensionAngle < 145` (maximum = extension) |
+
+   Median for the trunk, 5th percentile for the knees, deliberately: sag is a posture held
+   across the lift, while a knee bend is an event within it. The labelled knee-flexion clip
+   sits at a normal 159° median and only drops below threshold for 10% of its support
+   phase, so a median would have missed it entirely.
+
+   **Calibrated against the 3 labelled clips** in the reference set (correct / trunk
+   extension / knee flexion), which the old thresholds all scored 3. Body line: the
+   labelled trunk-extension clip is the highest of 21 at 0.1365 with a 0.047 gap to the
+   field — the largest gap in the distribution. Knees: counting support frames below 136°,
+   **18 of 21 clips have exactly zero**; the three that do not are the labelled
+   knee-flexion demo (33 frames, 0.46 s), Sample-17 (46 frames, 0.77 s) and Sample-2 (170
+   frames, 4.10 s), with knee confidence 0.74–0.93, so these are real bends and not
+   dropout.
+
+   Being straight about the range check: peak extension across the set is 155.9°–178.8°,
+   so **it fires on nothing, and that is correct** — no subject failed to complete a rep.
+   It now measures the right quantity; it is not a calibration win.
+
+   Effect, HEAD vs working tree over all 146 cached clips: **4 score changes, all in
+   push-up, 0 in the other six movements.** Both labelled fault clips move 3 → 2 naming
+   the correct fault, the labelled correct clip stays 3, and Sample-2 and Sample-17 move
+   3 → 2 on sustained knee flexion. Push-up distribution `{3: 21}` → `{2: 4, 3: 17}`.
+
+   **Hand position — the real 3-vs-2 criterion — remains PENDING, and is registered as a
+   pending check rather than guessed at.** It is computable in principle: wrists, nose,
+   ears, shoulders and hips are all in COCO-17, visible in 100% of frames, wrist
+   confidence 0.79–1.09 during support. It cannot be thresholded, for four independent
+   reasons:
+
+   - No thumb or hand keypoint. The clinical cue is *thumb* position; wrist-to-thumb is
+     about a hand length, comparable to the discrimination band itself.
+   - No chin and no forehead landmark. COCO-17's head is nose/eyes/ears, all clustered on
+     the upper face: the nose-to-ear span along the body axis measures **0.032 torso
+     lengths**, and that is the entire head-scale ruler available.
+   - Noise swamps it. The wrist-vs-nose measure varies by 0.052–0.720 within a single clip
+     (median ≈ 0.16 torso lengths) — roughly **5× that ruler**.
+   - No ground truth. No reference clip records which hand position the subject used, so
+     there is nothing to calibrate against even if the precision existed.
+
+   No number is exposed for it, deliberately: a value with ±0.16 noise against a 0.03
+   ruler would invite over-reading. **Ask of the department: a few reference clips labelled
+   with the hand position used.** Until then push-up 3-vs-2 is not fully automated — what
+   this work bought is that the fault criteria now function, where before none did.
+
+9. ~~**`requirements.txt` is not usable on Windows as-is.**~~ **FIXED 10 Sep 2026.**
+
+   The original entry over-counted the problem: it blamed "the full `nvidia-*-cu12` wheel
+   set", but all 74 pins were checked against PyPI and **13 of the 16 `nvidia-*` packages
+   publish Windows wheels perfectly well**. Exactly four pins were Linux-only —
+   `nvidia-cufile-cu12`, `nvidia-nccl-cu12`, `nvidia-nvshmem-cu12` and `triton` — with no
+   Windows wheel *and no sdist*, so an unmarked pin made the whole file fail to resolve.
+   A fifth line was separately broken: `onnxruntime-gpu==1.24.2`, a version that **does not
+   exist on PyPI** (neither does 1.24.3; 1.24.4 does, and is what the working venv has).
+
+   Fixed as **one file with PEP 508 environment markers**, not a
+   `requirements-win.txt` / `requirements-linux.txt` split: the two variants differ on four
+   lines out of 74, so a split would mean 70 shared pins kept in step by hand. The four
+   carry `platform_system == "Linux" and platform_machine == "x86_64"` — copied verbatim
+   from how torch 2.10.0 declares these same four as its own dependencies, so the file
+   agrees with upstream instead of approximating it. (A first attempt used
+   `sys_platform == "linux"`, which would have wrongly tried to install them on Linux ARM.)
+
+   **A second, worse bug surfaced during verification, and it was silent.** `rtmlib 0.0.15`
+   hard-requires the CPU `onnxruntime` distribution, so pip installs it *alongside*
+   `onnxruntime-gpu`. Both ship the same `onnxruntime` module and pip writes the CPU one
+   last. A clean `pip install -r requirements.txt` therefore came up reporting
+   `onnxruntime 1.29.0` with providers `['AzureExecutionProvider', 'CPUExecutionProvider']`
+   — **no CUDA, and no error anywhere**. That is worse than the original failure, which at
+   least failed loudly.
+
+   A requirements file cannot express "skip this transitive dependency", so the install is
+   now a documented three-step sequence (install, `pip uninstall -y onnxruntime`,
+   `pip install --force-reinstall --no-deps onnxruntime-gpu==1.24.4`) with a provider check
+   afterwards, all recorded in the file's own header. Note that the correct end state makes
+   `pip check` report *"rtmlib requires onnxruntime, which is not installed"* — that warning
+   is expected, and the working `.venv` has read exactly that all along.
+
+   **Verified** by building a throwaway venv on this Windows machine and running the
+   documented sequence end to end: resolution succeeds, the four marked packages are
+   correctly skipped, and the result reports `1.24.4` with
+   `['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']`,
+   matching the working `.venv` exactly.
+
+   Still worth knowing: `torch` is the **CPU** build here (`2.10.0+cpu`,
+   `torch.cuda.is_available() == False`) and that is correct, not a broken install — the
+   pose pipeline runs on onnxruntime-gpu's CUDA provider, not on torch. Everything comes
+   from plain PyPI; no `--extra-index-url` is needed.
 
 10. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
-   **24 tests** with the threshold, side-splitting and declared-side work (section 12), which now guard the declared
+   **31 tests** with the threshold, side-splitting and declared-side work (section 12), which now guard the declared
    thresholds against the scoring code and asserts that pending checks can never be
    evaluated. Still missing: per-fault behavioural coverage for
    the other six tests — only the deep squat's depth fault is exercised end to end — and
@@ -1074,13 +1186,32 @@ once the department signs the numbers off — that is when the distinction start
 alongside `onnxruntime-gpu` makes them **shadow each other** — both provide the same
 `onnxruntime` module. `build_detector` would report `device="cuda"` while every session
 ran on CPU. The fix was uninstalling both, then
-`pip install --force-reinstall --no-deps onnxruntime-gpu==1.24.2`.
+`pip install --force-reinstall --no-deps onnxruntime-gpu==1.24.4`.
+
+This entry recorded that command as `==1.24.2` until 10 Sep 2026, which is a version that
+**does not exist on PyPI** — anyone following it would have hit `No matching distribution`.
+And the trap is not a one-off: `rtmlib 0.0.15` hard-requires the CPU `onnxruntime`, so
+**every** clean `pip install -r requirements.txt` re-creates it. That is why the install is
+now a documented three-step sequence; see item 9 of section 13 and the header of
+`requirements.txt`.
 
 `build_detector` in `fms_pipeline.py` now **verifies rather than trusts**: it inspects
 every session's actual provider list and requires `CUDAExecutionProvider` in all of them,
 printing an explicit fallback warning otherwise. **Never take a `device` label as evidence
-CUDA is live — confirm with measured throughput (~14.6 fps extraction) or the provider
-list.** The `"device": "cuda"` field in `all_samples_report.json` is self-reported from
+CUDA is live — confirm with measured throughput (~14.6 fps extraction) or the *session*
+provider list.**
+
+**And do not use `onnxruntime.get_available_providers()` as that check either** (learned
+10 Sep 2026). It lists providers **compiled in**, not providers that can actually load. On
+a correct install it happily reports `CUDAExecutionProvider` while a bare
+`InferenceSession` falls back to CPU with
+`Error loading onnxruntime_providers_cuda.dll ... cublasLt64_12.dll is missing` — because
+the CUDA DLLs shipped inside the `nvidia-*` wheels are not on the Windows DLL search path
+by default. `build_detector` handles this by calling `_configure_windows_cuda_dll_paths()`
+(which `os.add_dll_directory`s them) *before* importing rtmlib, which is why the pipeline
+gets CUDA and an ad-hoc script does not. Both `.venv/` and a venv freshly built from
+`requirements.txt` behave identically here: bare session → CPU, `build_detector` → CUDA on
+every session. Only the last of those is evidence. The `"device": "cuda"` field in `all_samples_report.json` is self-reported from
 *before* this fix, though CUDA was independently confirmed for that run by timing.
 
 **Long-running batches on Windows.** PowerShell `Start-Process` detached processes were
