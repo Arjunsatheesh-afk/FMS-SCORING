@@ -277,12 +277,22 @@ def score_tracked_file(
     hand_length_in: float = 8.0,
     shoulder_width_in: float = 16.0,
     declared_side: str | None = None,
+    front_tracked_json: Path | None = None,
 ) -> dict[str, Any]:
     from fms_scoring import frames_from_tracked_json
 
     with open(tracked_json, "r", encoding="utf-8") as handle:
         data = json.load(handle)
     frames = frames_from_tracked_json(data)
+
+    # An optional second clip of the same attempt filmed from the front. Only
+    # the tests with front-view checks use it; the scorer decides per check
+    # whether the footage is good enough and records why when it is not.
+    front_frames = None
+    if front_tracked_json is not None:
+        with open(front_tracked_json, "r", encoding="utf-8") as handle:
+            front_frames = frames_from_tracked_json(json.load(handle))
+
     result = FMSScorer().score(
         test_id,
         frames,
@@ -291,9 +301,12 @@ def score_tracked_file(
         hand_length_in=hand_length_in,
         shoulder_width_in=shoulder_width_in,
         declared_side=declared_side,
+        front_frames=front_frames,
     )
     result["source"] = data.get("metadata", {}).get("source", str(tracked_json))
     result["trackedJson"] = str(tracked_json)
+    if front_tracked_json is not None:
+        result["frontTrackedJson"] = str(front_tracked_json)
     return result
 
 

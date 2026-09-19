@@ -52,6 +52,30 @@ export interface FmsCheck {
   /** A target that is not a number, e.g. "heel remains in contact". */
   targetText: string | null;
   reason: string | null;
+  /**
+   * True when the check can only be judged from a front-view clip, so whether
+   * it ran differs per screening. Optional so an older server still parses.
+   */
+  frontView?: boolean;
+  /** A threshold chosen without labelled clips to calibrate it. */
+  provisional?: boolean;
+}
+
+/**
+ * Why an optional check did not run for one screening. Decided by the scorer
+ * from the footage itself, never from which patient or sample it is.
+ */
+export type AssessmentReason =
+  | 'no_front_clip'
+  | 'front_clip_axial'
+  | 'low_confidence'
+  | 'no_valid_measurement'
+  | 'system_limit';
+
+export interface CheckAssessment {
+  key: string;
+  status: 'evaluated' | 'not_assessed';
+  reason: AssessmentReason | null;
 }
 
 /** Shoulder mobility maps a distance straight to a score, with no cutoffs. */
@@ -159,6 +183,14 @@ export interface AnalysisResult {
    * silent.
    */
   declarationConflict?: boolean;
+  /**
+   * Which optional checks ran for THIS screening, and why not where they did
+   * not. Absent on results stored before it existed, which fall back to
+   * `measurements.notAssessed`.
+   */
+  checkAssessment?: CheckAssessment[];
+  /** What the supplied front clip measured as; null when none was supplied. */
+  frontView?: 'frontal' | 'axial' | 'side' | null;
   /** Absent when the overlay render failed or was not attempted. */
   annotatedVideo?: AnnotatedVideo;
   annotatedVideoError?: string;

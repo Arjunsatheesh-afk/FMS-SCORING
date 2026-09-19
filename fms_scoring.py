@@ -140,6 +140,23 @@ class Check:
     target_text: str | None = None
     reason: str | None = None
 
+    # A check that can only be judged from a FRONT-view clip lists the landmarks
+    # it needs here; whether it ran is then decided per screening from the
+    # footage actually supplied - see assess_checks. Empty means the check is
+    # judged from the side-view clip like everything else.
+    front_landmarks: tuple[str, ...] = ()
+    # False for a check that survives a camera placed at the head or feet: the
+    # shoulder line lies across the image from the head end, so shoulder
+    # lowering can still be read there while anything needing the hips cannot.
+    front_view_sensitive: bool = True
+    # A threshold chosen without labelled clips to calibrate it against. The
+    # report marks it so, rather than presenting a guess as a validated cutoff.
+    provisional: bool = False
+
+    @property
+    def front_view(self) -> bool:
+        return bool(self.front_landmarks)
+
     @property
     def kind(self) -> str:
         if self.pending:
@@ -243,13 +260,29 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
             "knee_alignment_compensation",
             "knee alignment compensation",
             pending=True,
-            reason="needs front-view footage — this is frontal-plane motion",
+            reason="no validated lunge measurement: in an in-line stance the trailing "
+            "leg is hidden behind the lead leg, and the squat's knee-alignment "
+            "geometry reads a correctly aligned lead knee as inward",
+            front_landmarks=(
+                "left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle",
+            ),
         ),
+        # Lateral pelvis displacement from the board line both feet stand on,
+        # 95th percentile over the bottom of the lunge. PROVISIONAL: no clip in the
+        # reference set is labelled with a loss of balance. The three frontal
+        # lunge clips measured sit at 0.060-0.064, which reads as the ordinary
+        # sway of a correct lunge, so the cut is set clear of that cluster rather
+        # than inside it - a guess about where a fault begins, marked as one.
         Check(
             "balance_or_pelvis_shift",
             "balance / pelvic shift",
-            pending=True,
-            reason="needs front-view footage — this is frontal-plane motion",
+            "frontPelvisShiftNorm",
+            "gt",
+            0.15,
+            "torso",
+            "loss_of_balance_pelvic_shift",
+            front_landmarks=("left_hip", "right_hip", "left_ankle", "right_ankle"),
+            provisional=True,
         ),
         Check(
             "lead_ankle_dorsiflexion",
@@ -304,7 +337,10 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
             "pelvis_lift_or_rotation",
             "pelvis lift or rotation",
             pending=True,
-            reason="needs front-view or 3D — the pelvis axis points at the camera",
+            reason="no validated measurement yet: every front-view ASLR clip so far was "
+            "filmed from the feet, where the two hip points collapse together as the "
+            "leg rises",
+            front_landmarks=("left_hip", "right_hip"),
         ),
     ),
     "trunk_stability_pushup": (
@@ -348,13 +384,27 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
             "shoulder_or_pelvis_rotation",
             "shoulder or pelvis rotation",
             pending=True,
-            reason="needs front-view footage — this is transverse-plane motion",
+            reason="no validated measurement yet: it needs the hips, and in every "
+            "front-view rotary clip so far the detector placed them on the chest",
+            front_landmarks=("left_shoulder", "right_shoulder", "left_hip", "right_hip"),
         ),
+        # Shoulder-line tilt away from its own clip median (which cancels camera
+        # roll), 95th percentile. Not view-sensitive: from the head end the
+        # shoulder line lies across the image, so it survives the placement that
+        # ruins the hips. PROVISIONAL: no clip is labelled with a shoulder drop.
+        # The four measured subjects peak at 13.5-19.1 degrees, which reads as the
+        # normal signature of lifting an arm, so the cut sits above that cluster.
         Check(
             "shoulder_lowering",
             "shoulder lowering",
-            pending=True,
-            reason="needs front-view footage — this is transverse-plane motion",
+            "frontShoulderTiltDeg",
+            "gt",
+            25.0,
+            "°",
+            "shoulder_lowering",
+            front_landmarks=("left_shoulder", "right_shoulder"),
+            front_view_sensitive=False,
+            provisional=True,
         ),
     ),
 }
@@ -362,6 +412,185 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
 
 def checks_for(test_id: str) -> tuple[Check, ...]:
     return THRESHOLDS.get(test_id, ())
+
+
+# --------------------------------------------------------------------------
+# Per-screening check assessment
+#
+# Which optional checks actually ran is a fact about ONE screening, not about a
+# test. Two screenings of the same movement can differ: one with a usable
+# front-view clip, one with side-view footage only. The report must show that
+# difference with its reason, or a reviewer comparing them sees two different
+# check lists and no explanation.
+#
+# The reason is decided from the footage itself - what the clip measurably is -
+# never from which sample or patient it belongs to, and never from future
+# plans. "A reshoot is coming" would go stale the day it happened; "the front
+# clip was filmed from the feet" stays true.
+# --------------------------------------------------------------------------
+
+ASSESSED = "evaluated"
+NOT_ASSESSED = "not_assessed"
+
+REASON_NO_FRONT_CLIP = "no_front_clip"
+REASON_FRONT_CLIP_AXIAL = "front_clip_axial"
+REASON_LOW_CONFIDENCE = "low_confidence"
+REASON_SYSTEM_LIMIT = "system_limit"
+# The landmarks are visible and confident, but no measurement for this check has
+# been validated. Distinct from a footage problem: better footage would not fix
+# it, a measurement would.
+REASON_NO_VALID_MEASUREMENT = "no_valid_measurement"
+
+# Median hip-width / torso-length over a clip. Measured on the reference
+# footage: side views 0.06-0.12, genuinely frontal and elevated views 0.39-0.50,
+# head- and feet-end views 1.25-2.60. Both cuts sit in the empty bands between.
+FRONT_AXIAL_MIN_HIP_TORSO = 0.9
+FRONT_SIDE_MAX_HIP_TORSO = 0.22
+# A check runs only if its own landmarks clear this, averaged over the clip as
+# the weakest landmark per frame, on nearly every frame.
+FRONT_MIN_LANDMARK_CONFIDENCE = 0.6
+FRONT_MIN_USABLE_SHARE = 0.95
+
+_FRONT_SMOOTH = 9                # median filter width, frames
+_FRONT_SUMMARY_PERCENTILE = 95   # a compensation is an event, so read near the peak
+_LUNGE_BOTTOM_PERCENTILE = 80    # pelvis at or below this share of its travel
+
+
+def classify_front_view(frames: list["FMSFrame"] | None) -> str | None:
+    """'frontal', 'axial' (camera at the head or feet) or 'side', from the clip.
+
+    None when there is no clip or nothing to measure it by. A clip labelled as a
+    front view that measures as a side view is reported as 'side' - the label is
+    what someone typed, the ratio is what the camera saw.
+    """
+    if not frames:
+        return None
+    ratios = []
+    for frame in frames:
+        torso = _torso_length(frame)
+        left_hip = _point(frame, "left_hip")
+        right_hip = _point(frame, "right_hip")
+        if torso is None or left_hip is None or right_hip is None:
+            continue
+        ratios.append(float(np.linalg.norm(left_hip - right_hip)) / torso)
+    if not ratios:
+        return None
+    ratio = float(np.median(ratios))
+    if ratio >= FRONT_AXIAL_MIN_HIP_TORSO:
+        return "axial"
+    if ratio <= FRONT_SIDE_MAX_HIP_TORSO:
+        return "side"
+    return "frontal"
+
+
+def _landmark_quality(frames: list["FMSFrame"], names: tuple[str, ...]) -> tuple[float, float]:
+    """(mean confidence of the weakest named landmark, share of frames usable)."""
+    indices = [KP[name] for name in names]
+    weakest = [float(np.min(frame.scores[indices])) for frame in frames]
+    if not weakest:
+        return 0.0, 0.0
+    usable = sum(1 for value in weakest if value >= SCORE_THR) / len(weakest)
+    return float(np.mean(weakest)), usable
+
+
+def assess_checks(
+    test_id: str,
+    front_frames: list["FMSFrame"] | None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Status and reason for every optional check of one screening.
+
+    Covers checks that need a front view and checks this system cannot measure
+    at all; ordinary side-view checks always run and are not listed. Returns the
+    entries plus the measured class of the front clip, if one was supplied.
+    """
+    view = classify_front_view(front_frames)
+    entries: list[dict[str, Any]] = []
+    for check in checks_for(test_id):
+        if check.front_view:
+            if not front_frames or view in (None, "side"):
+                reason = REASON_NO_FRONT_CLIP
+            elif check.front_view_sensitive and view == "axial":
+                reason = REASON_FRONT_CLIP_AXIAL
+            else:
+                confidence, usable = _landmark_quality(front_frames, check.front_landmarks)
+                if confidence < FRONT_MIN_LANDMARK_CONFIDENCE or usable < FRONT_MIN_USABLE_SHARE:
+                    reason = REASON_LOW_CONFIDENCE
+                elif check.pending:
+                    reason = REASON_NO_VALID_MEASUREMENT
+                else:
+                    entries.append({"key": check.key, "status": ASSESSED, "reason": None})
+                    continue
+            entries.append({"key": check.key, "status": NOT_ASSESSED, "reason": reason})
+        elif check.pending:
+            entries.append({"key": check.key, "status": NOT_ASSESSED, "reason": REASON_SYSTEM_LIMIT})
+    return entries, view
+
+
+def evaluated_keys(entries: list[dict[str, Any]]) -> frozenset[str]:
+    return frozenset(entry["key"] for entry in entries if entry["status"] == ASSESSED)
+
+
+def _front_pelvis_shift_norm(frames: list["FMSFrame"]) -> float | None:
+    """Lateral pelvis offset from the board line, near its peak at the lunge's bottom.
+
+    Both feet of an in-line lunge stand on the same board, so the ankle midpoint
+    marks the base of support even when the trailing foot is hidden behind the
+    lead foot and both ankle points land on the one visible foot.
+    """
+    hip_y: list[float | None] = []
+    for frame in frames:
+        mid = _midpoint(frame, "left_hip", "right_hip")
+        hip_y.append(None if mid is None else float(mid[1]))
+    known = [y for y in hip_y if y is not None]
+    if not known:
+        return None
+    # Image y grows downward, so the lowest pelvis has the largest y.
+    cut = float(np.percentile(known, _LUNGE_BOTTOM_PERCENTILE))
+    shifts: list[float | None] = []
+    for frame, y in zip(frames, hip_y):
+        if y is None or y < cut:
+            continue
+        mid = _midpoint(frame, "left_hip", "right_hip")
+        left = _point(frame, "left_ankle")
+        right = _point(frame, "right_ankle")
+        torso = _torso_length(frame)
+        if mid is None or left is None or right is None or torso is None:
+            shifts.append(None)
+            continue
+        shifts.append(abs(float(mid[0] - (left[0] + right[0]) / 2.0)) / torso)
+    smoothed = [v for v in _median_filter(shifts, _FRONT_SMOOTH) if v is not None]
+    return float(np.percentile(smoothed, _FRONT_SUMMARY_PERCENTILE)) if smoothed else None
+
+
+def _front_shoulder_tilt_deg(frames: list["FMSFrame"]) -> float | None:
+    """How far the shoulder line tips away from its own usual angle, near peak.
+
+    Measured against the clip's median rather than horizontal, so a camera that
+    is slightly rolled does not read as a shoulder drop. A segment has no head
+    or tail, so orientation is taken modulo 180 degrees: a left/right label swap
+    must not register as a half turn.
+    """
+    orientation: list[float | None] = []
+    for frame in frames:
+        left = _point(frame, "left_shoulder")
+        right = _point(frame, "right_shoulder")
+        if left is None or right is None:
+            orientation.append(None)
+            continue
+        delta = left - right
+        angle = math.degrees(math.atan2(delta[1], delta[0])) % 180.0
+        orientation.append(angle - 180.0 if angle > 90.0 else angle)
+    smoothed = [v for v in _median_filter(orientation, _FRONT_SMOOTH) if v is not None]
+    if not smoothed:
+        return None
+    usual = float(np.median(smoothed))
+    return float(np.percentile([abs(v - usual) for v in smoothed], _FRONT_SUMMARY_PERCENTILE))
+
+
+# Tests with at least one check that needs a front view. Only these accept one.
+FRONT_VIEW_TESTS = tuple(
+    test_id for test_id, checks in THRESHOLDS.items() if any(c.front_view for c in checks)
+)
 
 
 # --------------------------------------------------------------------------
@@ -694,6 +923,8 @@ def threshold_spec() -> dict[str, Any]:
                     "targetUnit": check.target_unit,
                     "targetText": check.target_text,
                     "reason": check.reason,
+                    "frontView": check.front_view,
+                    "provisional": check.provisional,
                 }
                 for check in checks_for(test_id)
             ],
@@ -787,6 +1018,7 @@ class FMSScorer:
         hand_length_in: float = 8.0,
         shoulder_width_in: float = 16.0,
         declared_side: str | None = None,
+        front_frames: list[FMSFrame] | None = None,
     ) -> dict[str, Any]:
         if test_id not in FMS_TESTS:
             raise ValueError(f"Unknown FMS test: {test_id}")
@@ -829,6 +1061,11 @@ class FMSScorer:
                 "status": "insufficient_data",
             }
 
+        # A front clip is only meaningful for tests that have front-view checks;
+        # for any other test it is ignored rather than half-used.
+        front = front_frames if (front_frames and test_id in FRONT_VIEW_TESTS) else None
+        assessment, front_view = assess_checks(test_id, front)
+
         method = getattr(self, f"_score_{test_id}")
         if test_id == "shoulder_mobility":
             result = method(
@@ -836,6 +1073,12 @@ class FMSScorer:
                 hand_length_in=hand_length_in,
                 shoulder_width_in=shoulder_width_in,
             )
+        elif test_id in FRONT_VIEW_TESTS:
+            # Front-view checks are judged once, on the whole screening. The
+            # per-side scores below re-run the method on side-view segments
+            # without a front clip, because a front clip cannot be divided by a
+            # switch detected in a different video.
+            result = method(usable, front=front, evaluated=evaluated_keys(assessment))
         else:
             result = method(usable)
 
@@ -878,6 +1121,12 @@ class FMSScorer:
             # The declaration stands, but the disagreement is recorded so the
             # report can show it rather than leaving it silent.
             "declarationConflict": detected in ("both", "split"),
+            # Which optional checks ran for THIS screening, and why not where
+            # they did not. The report reads this rather than the per-test spec,
+            # so two screenings of one movement can honestly differ.
+            "checkAssessment": assessment,
+            # What the supplied front clip measured as, or None without one.
+            "frontView": front_view,
         }
 
     def _score_each_side(
@@ -1016,33 +1265,57 @@ class FMSScorer:
             confidence=_attempt_confidence(frames),
         )
 
-    def _score_inline_lunge(self, frames: list[FMSFrame]) -> dict[str, Any]:
+    def _score_inline_lunge(
+        self,
+        frames: list[FMSFrame],
+        front: list[FMSFrame] | None = None,
+        evaluated: frozenset[str] = frozenset(),
+    ) -> dict[str, Any]:
         frame = min(frames, key=lambda item: _avg_angle(item, ["left_knee_angle", "right_knee_angle"], 180))
         m = _base_measurements(frame)
         knee_angle = m["kneeAngle"]
         trunk_lean = _trunk_lean_deg(frame)
 
-        # knee_alignment_compensation and balance_or_pelvis_shift are dropped:
-        # both are frontal-plane quantities and this test is filmed sagittally,
-        # where they are unrecoverable rather than merely noisy. See notAssessed.
-        values = {"kneeAngle": knee_angle, "trunkLeanDeg": trunk_lean}
+        # knee_alignment_compensation and balance_or_pelvis_shift are
+        # frontal-plane quantities, unrecoverable from the side-view clip this
+        # test is scored from. Balance runs when a usable front clip is
+        # supplied; knee alignment has no valid lunge measurement at all yet.
+        values: dict[str, float | None] = {"kneeAngle": knee_angle, "trunkLeanDeg": trunk_lean}
+        pelvis_shift = (
+            _front_pelvis_shift_norm(front)
+            if front and "balance_or_pelvis_shift" in evaluated
+            else None
+        )
+        values["frontPelvisShiftNorm"] = pelvis_shift
 
         faults = []
         if _fires("inline_lunge", "insufficient_knee_flexion", values):
             faults.append("insufficient_knee_flexion")
         if _fires("inline_lunge", "forward_trunk_lean", values):
             faults.append("forward_trunk_lean")
+        if _fires("inline_lunge", "loss_of_balance_pelvic_shift", values):
+            faults.append("loss_of_balance_pelvic_shift")
+
+        measurements: dict[str, Any] = {
+            **m,
+            "trunkLeanDeg": round(trunk_lean, 2),
+            "scoredFrame": frame.frame,
+            # Kept for results stored before checkAssessment existed and for
+            # anything still reading it; now it drops whatever did run.
+            "notAssessed": [
+                key
+                for key in ("knee_alignment_compensation", "balance_or_pelvis_shift")
+                if key not in evaluated
+            ],
+        }
+        if pelvis_shift is not None:
+            measurements["frontPelvisShiftNorm"] = round(pelvis_shift, 3)
 
         complete = not _incomplete("inline_lunge", values)
         return _score_from_faults(
             faults,
             complete,
-            {
-                **m,
-                "trunkLeanDeg": round(trunk_lean, 2),
-                "scoredFrame": frame.frame,
-                "notAssessed": ["knee_alignment_compensation", "balance_or_pelvis_shift"],
-            },
+            measurements,
             confidence=_attempt_confidence(frames),
         )
 
@@ -1144,7 +1417,15 @@ class FMSScorer:
             "confidence": round(_attempt_confidence(frames), 3),
         }
 
-    def _score_active_straight_leg_raise(self, frames: list[FMSFrame]) -> dict[str, Any]:
+    def _score_active_straight_leg_raise(
+        self,
+        frames: list[FMSFrame],
+        front: list[FMSFrame] | None = None,
+        evaluated: frozenset[str] = frozenset(),
+    ) -> dict[str, Any]:
+        # Accepts a front clip for the stored reason alone: pelvis lift/rotation
+        # has no validated measurement, so nothing here is computed from it.
+        del front
         frame = min(frames, key=lambda item: min(_angle(item, "left_hip_angle", 180), _angle(item, "right_hip_angle", 180)))
         left_hip = _angle(frame, "left_hip_angle", 180)
         right_hip = _angle(frame, "right_hip_angle", 180)
@@ -1189,7 +1470,9 @@ class FMSScorer:
                 "oppositeKneeAngle": round(opposite_knee, 2),
                 "oppositeHipAngle": round(opposite_hip, 2),
                 "scoredFrame": frame.frame,
-                "notAssessed": ["pelvis_lift_or_rotation"],
+                "notAssessed": [
+                    key for key in ("pelvis_lift_or_rotation",) if key not in evaluated
+                ],
             },
             confidence=_attempt_confidence(frames),
         )
@@ -1282,32 +1565,57 @@ class FMSScorer:
             confidence=_attempt_confidence(frames),
         )
 
-    def _score_rotary_stability(self, frames: list[FMSFrame]) -> dict[str, Any]:
+    def _score_rotary_stability(
+        self,
+        frames: list[FMSFrame],
+        front: list[FMSFrame] | None = None,
+        evaluated: frozenset[str] = frozenset(),
+    ) -> dict[str, Any]:
         frame = min(frames, key=lambda item: _elbow_knee_distance_norm(item))
         touch_distance = _elbow_knee_distance_norm(frame)
 
-        # shoulder_or_pelvis_rotation and shoulder_lowering are dropped: both
-        # derive from transverse-segment tilt, which is unrecoverable from the
-        # sagittal view this test is filmed from. The elbow-to-knee touch is
-        # kept because that movement happens in the plane the camera sees.
+        # shoulder_or_pelvis_rotation and shoulder_lowering derive from
+        # transverse-segment tilt, unrecoverable from the side-view clip. The
+        # elbow-to-knee touch is kept because that movement happens in the plane
+        # the camera sees. Shoulder lowering runs when a front clip tracks the
+        # shoulders well; the rotation check needs the hips and has no valid
+        # measurement yet.
         # 0.40 sits in the empty band of the reference distribution: 16 of 18
         # attempts land at or below 0.284 and the two genuine misses at 0.817.
         # A tighter cut would clip the top of the successful cluster instead.
-        values = {"elbowKneeDistanceNorm": touch_distance}
+        shoulder_tilt = (
+            _front_shoulder_tilt_deg(front)
+            if front and "shoulder_lowering" in evaluated
+            else None
+        )
+        values: dict[str, float | None] = {
+            "elbowKneeDistanceNorm": touch_distance,
+            "frontShoulderTiltDeg": shoulder_tilt,
+        }
 
         faults = []
         if _fires("rotary_stability", "fail_to_touch_elbow_to_knee", values):
             faults.append("fail_to_touch_elbow_to_knee")
+        if _fires("rotary_stability", "shoulder_lowering", values):
+            faults.append("shoulder_lowering")
+
+        measurements: dict[str, Any] = {
+            "elbowKneeDistanceNorm": round(touch_distance, 3),
+            "scoredFrame": frame.frame,
+            "notAssessed": [
+                key
+                for key in ("shoulder_or_pelvis_rotation", "shoulder_lowering")
+                if key not in evaluated
+            ],
+        }
+        if shoulder_tilt is not None:
+            measurements["frontShoulderTiltDeg"] = round(shoulder_tilt, 2)
 
         complete = not _incomplete("rotary_stability", values)
         return _score_from_faults(
             faults,
             complete,
-            {
-                "elbowKneeDistanceNorm": round(touch_distance, 3),
-                "scoredFrame": frame.frame,
-                "notAssessed": ["shoulder_or_pelvis_rotation", "shoulder_lowering"],
-            },
+            measurements,
             confidence=_attempt_confidence(frames),
         )
 

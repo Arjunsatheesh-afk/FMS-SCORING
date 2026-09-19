@@ -1,5 +1,6 @@
 import {
   AnalysisResult,
+  AssessmentReason,
   FmsCheck,
   FmsScoreBand,
   FmsSideResult,
@@ -129,6 +130,8 @@ export const MEASUREMENT_SPEC: Record<FmsTestId, MeasurementSpec[]> = {
     { key: 'kneeAngle', label: 'Knee angle', unit: '°', decimals: 1 },
     { key: 'hipAngle', label: 'Hip angle', unit: '°', decimals: 1 },
     { key: 'trunkLeanDeg', label: 'Trunk lean', unit: '°', decimals: 1 },
+    // Present only when a usable front-view clip was supplied.
+    { key: 'frontPelvisShiftNorm', label: 'Pelvic shift (front view)', unit: 'torso', decimals: 3 },
   ],
   shoulder_mobility: [
     { key: 'bestDistanceHandLengths', label: 'Hand separation', unit: 'hand', decimals: 2 },
@@ -159,6 +162,8 @@ export const MEASUREMENT_SPEC: Record<FmsTestId, MeasurementSpec[]> = {
   ],
   rotary_stability: [
     { key: 'elbowKneeDistanceNorm', label: 'Elbow-to-knee gap', unit: 'limb', decimals: 3 },
+    // Present only when a front-view clip tracked the shoulders well.
+    { key: 'frontShoulderTiltDeg', label: 'Shoulder tilt (front view)', unit: '°', decimals: 1 },
   ],
 };
 
@@ -226,9 +231,13 @@ export function formatCheck(check: FmsCheck, testId: FmsTestId) {
     check.unit,
     decimalsFor(testId, check.measurement),
   );
-  return check.kind === 'completion'
-    ? `not completed ${arrow} ${amount}`
-    : `${check.label} fault ${arrow} ${amount}`;
+  const text =
+    check.kind === 'completion'
+      ? `not completed ${arrow} ${amount}`
+      : `${check.label} fault ${arrow} ${amount}`;
+  // No labelled clip exists to calibrate these, so the sheet must not present
+  // the number as a validated cutoff.
+  return check.provisional ? `${text} (provisional)` : text;
 }
 
 /** True when the measured value breaches the check. Mirrors Check.fails. */
@@ -352,6 +361,126 @@ export interface PendingRow {
   reason: string;
 }
 
+/**
+ * The sentence shown for each reason. system_limit and no_valid_measurement are
+ * specific to the check, so those read the check's own reason from the spec.
+ */
+const REASON_TEXT: Record<AssessmentReason, string | null> = {
+  no_front_clip: 'Side view only — needs a front-view clip',
+  front_clip_axial: 'Front view was filmed from the head or feet end — hips not reliably tracked',
+  low_confidence: 'Front-view tracking confidence too low (below 0.6)',
+  no_valid_measurement: null,
+  system_limit: null,
+};
+
+export interface AssessmentGroups {
+  /** Checks actually judged for this screening. */
+  assessedCount: number;
+  /** Checks that did not run for THIS screening; can differ between screenings. */
+  notAssessed: PendingRow[];
+  /** Checks this system cannot measure at all; identical for every screening. */
+  systemLimits: PendingRow[];
+  /** One line on the footage behind this screening, or null where it is irrelevant. */
+  footage: string | null;
+}
+
+function toPendingRow(check: FmsCheck | undefined, key: string, reason: string): PendingRow {
+  return {
+    key,
+    label: check?.label ?? formatFault(key),
+    target: check ? formatTarget(check) : null,
+    reason,
+  };
+}
+
+/**
+ * Splits one screening's checks into what was judged, what was not judged for
+ * this screening, and what the system never measures.
+ *
+ * This is the only place the report decides that, and it reads the screening's
+ * own stored `checkAssessment` - not the per-test spec. The spec is the same for
+ * every screening of a movement, so driving the sheet from it would show
+ * identical gaps for a screening with a front-view clip and one without, which
+ * is exactly the confusion a reviewer comparing the two must not meet.
+ *
+ * Results stored before checkAssessment existed fall back to their
+ * `measurements.notAssessed` array. All of those were side-view-only uploads,
+ * which is what the fallback reason says.
+ */
+export function buildAssessmentGroups(
+  testId: FmsTestId,
+  result: AnalysisResult,
+  thresholds: { checks: FmsCheck[]; scoreBands?: FmsScoreBand[] } | undefined,
+): AssessmentGroups {
+  const checks = thresholds?.checks ?? [];
+  const byKey = new Map(checks.map((check) => [check.key, check]));
+  const measurements = (result.measurements ?? {}) as Record<string, unknown>;
+
+  const notAssessed: PendingRow[] = [];
+  const systemLimits: PendingRow[] = [];
+
+  if (Array.isArray(result.checkAssessment)) {
+    for (const entry of result.checkAssessment) {
+      if (entry.status !== 'not_assessed' || entry.reason === null) continue;
+      const check = byKey.get(entry.key);
+      const text = REASON_TEXT[entry.reason] ?? check?.reason ?? formatFault(entry.reason);
+      (entry.reason === 'system_limit' ? systemLimits : notAssessed).push(
+        toPendingRow(check, entry.key, text),
+      );
+    }
+  } else {
+    const legacy = Array.isArray(measurements.notAssessed)
+      ? (measurements.notAssessed as string[])
+      : [];
+    for (const key of legacy) {
+      const check = byKey.get(key);
+      if (check?.frontView === false && check.kind === 'pending') {
+        systemLimits.push(toPendingRow(check, key, check.reason ?? ''));
+      } else {
+        const text = check?.frontView
+          ? (REASON_TEXT.no_front_clip as string)
+          : (check?.reason ?? '');
+        notAssessed.push(toPendingRow(check, key, text));
+      }
+    }
+    // The fallback array never listed the checks nobody can measure, so those
+    // come from the spec, which is identical for every screening anyway.
+    for (const check of checks) {
+      if (check.kind === 'pending' && !check.frontView && !legacy.includes(check.key)) {
+        systemLimits.push(toPendingRow(check, check.key, check.reason ?? ''));
+      }
+    }
+  }
+
+  let assessedCount = 0;
+  for (const check of checks) {
+    if (check.kind === 'pending') continue;
+    // A rule with no stored value, e.g. arms overhead, is always judged; a
+    // numeric check counts only if this screening recorded its value.
+    if (check.measurement === null || typeof measurements[check.measurement] === 'number') {
+      assessedCount += 1;
+    }
+  }
+  if ((thresholds?.scoreBands?.length ?? 0) > 0 && typeof measurements.bestDistanceHandLengths === 'number') {
+    assessedCount += 1;
+  }
+
+  const hasFrontChecks = checks.some((check) => check.frontView);
+  let footage: string | null = null;
+  if (hasFrontChecks) {
+    footage =
+      result.frontView === 'frontal'
+        ? 'Side view + front view'
+        : result.frontView === 'axial'
+          ? 'Side view + front view filmed from the head or feet end'
+          : result.frontView === 'side'
+            ? 'Side view only (the clip supplied as a front view measured as a side view)'
+            : 'Side view only';
+  }
+
+  return { assessedCount, notAssessed, systemLimits, footage };
+}
+
 /** '15–30° DF', 'heel remains in contact', or null when no target exists. */
 function formatTarget(check: FmsCheck) {
   if (check.targetText) {
@@ -364,24 +493,6 @@ function formatTarget(check: FmsCheck) {
   return `${check.targetMin}–${check.targetMax}${check.targetUnit ?? ''}`;
 }
 
-/**
- * Checks this system does not measure yet, each with the department's target
- * and why it is outstanding.
- *
- * A null target is not an omission: the department's data is joint-angle
- * ranges, and the camera-angle casualties are qualitative compensations they
- * never gave a window for. The report says so rather than inventing one.
- */
-export function buildPendingRows(checks: FmsCheck[]): PendingRow[] {
-  return checks
-    .filter((check) => check.kind === 'pending')
-    .map((check) => ({
-      key: check.key,
-      label: check.label,
-      target: formatTarget(check),
-      reason: check.reason ?? '',
-    }));
-}
 
 export interface ReportRow {
   testId: FmsTestId;
@@ -522,6 +633,8 @@ export const FAULT_LABELS: Record<string, string> = {
   fail_to_touch_elbow_to_knee: 'Elbow did not reach knee',
   shoulder_or_pelvis_rotation: 'Shoulder or pelvis rotates',
   shoulder_lowering: 'Shoulder drops',
+  // Inline lunge
+  loss_of_balance_pelvic_shift: 'Pelvis shifts off the base (balance)',
 };
 
 export function formatFault(fault: string) {

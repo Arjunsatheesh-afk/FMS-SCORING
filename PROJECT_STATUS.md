@@ -102,7 +102,7 @@ auth_store.py             SQLite: users, tokens, results. All SQL is here.
 annotate_video.py         Skeleton-overlay renderer (reads cached keypoints, no detector).
 run_all_samples.py        Batch runner over the Dataset/ folder tree.
 seed_accounts.py          Creates the doctor + demo patients.
-test_fms_scoring.py       31 tests: the threshold table guarded against the
+test_fms_scoring.py       42 tests: the threshold table guarded against the
                           scoring code, side splitting, and the declared-side
                           rules. See section 13.
 
@@ -265,8 +265,8 @@ viewing azimuth directly, and the seven tests split cleanly with nothing in betw
 | Trunk Stability Push-Up | 0.19 | 0.21 | Sagittal |
 | Rotary Stability | 0.14 | 0.20 | Sagittal |
 
-Dropped checks, recorded in each result's `measurements.notAssessed` and surfaced in the
-app under *"Not assessed from this view"*:
+Dropped checks, recorded in each result's `measurements.notAssessed` (and, since 17 Sep
+2026, in the per-screening `checkAssessment` described below):
 
 | Test | Dropped | Why |
 |---|---|---|
@@ -287,6 +287,138 @@ anterior knee travel, which is large and normal in a lunge.
 **One check is effectively dead but not formally listed as dropped:** Deep Squat's
 `trunk_leans_forward` (`> 32°`). Forward lean is a sagittal quantity and the squat is
 filmed frontally, so it reads 0.0°–8.9° across all 18 subjects. Worth formalising.
+
+### Front-view footage and per-screening assessment (13–19 Sep 2026)
+
+**Why this exists.** Samples 1 and 7 keep their existing footage permanently; the other 16
+will get re-filmed ASLR and Rotary footage. So from now on two screenings of the same
+movement can legitimately have different checks run. The report must show that
+difference with its reason, or a reviewer comparing Sample 1 with Sample 3 sees two
+different check lists and no explanation.
+
+**The footage, measured rather than taken on trust.** Every "front view" clip was run
+through the same test: median hip-width ÷ torso over the clip. Side views read
+0.06–0.12, genuinely frontal or elevated views 0.39–0.50, and cameras placed at the
+head or feet ("axial") 1.25–2.60, with empty bands between.
+
+| Footage | hip/torso | Verdict |
+|---|---|---|
+| S1, S2, S9 Inline Lunge `front view.mp4` | 0.39–0.46 | Genuinely frontal |
+| S1, S2, S9 ASLR `front view.mp4` | 2.37–2.44 | Axial: camera at the feet |
+| S1, S2, S9 Rotary `front view.mp4` | 1.27–2.54 | Axial: camera at the head |
+| S7 ASLR `front view.mp4` (15 Sep) | 1.54–1.88 | Axial, despite being described as elevated |
+| S7 Rotary `front view .mp4` (15 Sep) | 1.43–1.44 | Axial, despite being described as elevated |
+| WhatsApp test clips #3, #7 Rotary (16 Sep) | 0.40, 0.50 | **Correct elevated view**, torso intact, hip confidence 0.61–0.62 |
+| WhatsApp test clips #4, #6 ASLR | 0.10, 0.12 | Flat side view, not elevated |
+| WhatsApp test clip #5 ASLR | detection failed | Axial (feet end), hip confidence 0.23 |
+| WhatsApp test clip #2 Push-Up | 0.95 | Head-on, not the expected side view |
+
+Two file problems in Sample 7: `Side view.mp4` in the ASLR folder is **byte-identical**
+(same SHA-256) to the original `5.mp4`, not new footage; and the Rotary files are named
+with a trailing space (`front view .mp4`, `side view .mp4`). The WhatsApp clips are
+480–848 px encodes, so their confidence figures likely understate full-resolution
+footage; the ratios are resolution-free.
+
+**Confidence is not correctness; this was learned twice.** Two checks looked computable on
+confidence alone and were not:
+- *ASLR pelvis rotation:* a 26–56° "rotation" signal that rose 4–8× when the leg lifted.
+  On the video, the two hip points collapse to 14 px apart mid-body as the leg rises, and
+  the "61.6° tilt" is error amplified over a 14 px baseline.
+- *Inline Lunge knee alignment:* S1 read 0.118 torso "medial", over the Deep Squat valgus
+  threshold of 0.10. On the video the lead knee sits directly over the lead foot
+  (x 413 over 410): correct alignment. `_knee_medial_offset` measures from the
+  hip-to-ankle line, which assumes feet under the hips. In an in-line stance the foot is
+  on the midline and the hip is off to the side, so a correct knee reads as inward. The
+  trailing leg is also hidden behind the lead leg, with both ankle points on the one
+  visible foot. **Enabling this check would have put a false valgus fault on Sample 1;
+  it was held back.**
+
+**What runs, and where (accepted front clips only, see below):**
+
+| Check | S1 | S7 | Evidence |
+|---|---|---|---|
+| Inline Lunge `balance_or_pelvis_shift` | **Evaluated**, 0.062 torso | no front clip | Pelvis vs the board line both feet share, so it survives the hidden trailing leg. Confidence 0.66, 100% of frames usable |
+| Inline Lunge `knee_alignment_compensation` | not assessed: `no_valid_measurement` | no front clip | Above: geometry artifact |
+| Rotary `shoulder_lowering` | **Evaluated**, 19.08° | **Evaluated**, 13.49° | Shoulder line lies across the image even from the head end. S1 conf 0.62, S7 0.67, 100% usable, 10th-percentile span 141 / 162 px |
+| Rotary `shoulder_or_pelvis_rotation` | not assessed: `front_clip_axial` | `front_clip_axial` | Needs hips; the detector puts them on the chest from the head end |
+| ASLR `pelvis_lift_or_rotation` | `front_clip_axial` | `front_clip_axial` | S7 hip conf 0.39, 80% usable, 10th-percentile hip span 9 px |
+
+**Provisional thresholds.** No clip is labelled with a loss of balance or a shoulder
+drop, so both new thresholds are guesses placed clear of what the reference subjects
+do. Both are marked `provisional` and the report says so beside the number.
+- Pelvic shift `> 0.15` torso: the three frontal lunges sit at 0.060–0.064.
+- Shoulder tilt `> 25°`: the four subjects measured sit at 13.5–19.1°, which reads as
+  the normal signature of lifting an arm.
+
+Neither fires on any accepted clip. **They need calibration clips from the department
+before they mean anything clinically.**
+
+**The per-screening reason system.** Every result now carries `checkAssessment`: for each
+optional check, `evaluated` or `not_assessed` plus a reason decided from the footage
+itself (never from which sample or patient it is, and never from reshoot plans, which go
+stale). Reasons:
+- `no_front_clip`: no front clip, or one that measured as a side view.
+- `front_clip_axial`: front clip filmed from the head or feet end. Only checks marked
+  view-sensitive are blocked; the shoulder line survives.
+- `low_confidence`: the check's own landmarks average below 0.6 (weakest landmark per
+  frame), or fewer than 95% of frames are usable.
+- `system_limit`: never measurable with this pose model (ankles, push-up hand position).
+- **`no_valid_measurement`: a fifth code, added beyond the four approved.** It covers a
+  front clip that is fine while no validated measurement exists (knee alignment on S1;
+  pelvis and shoulder-pelvis rotation once correctly angled footage arrives). None of the
+  four approved codes says this truthfully; `low_confidence` or `no_front_clip` would
+  have been false.
+
+Results also carry `frontView` (`frontal` / `axial` / `side` / null). `measurements.notAssessed`
+is kept, now minus whatever ran, for anything still reading it.
+
+The requirements live on the `Check` itself: `front_landmarks`, `front_view_sensitive`,
+`provisional`. There is no parallel table.
+
+**Which front clips count** is a scope decision, not a quality one, so it is an explicit
+manifest: `ACCEPTED_FRONT_CLIPS` in `run_all_samples.py`, with S1 for all three tests and
+S7 for ASLR and Rotary. Samples 2 and 9 have front clips on disk (the earlier axial
+attempt; their lunge clips are genuinely frontal) but are excluded. Front clips are
+pose-extracted separately into `fms_outputs/tracked_frontview/<test>/Sample-N.json`, and
+the batch runner does not extract them itself. **The app's upload flow still takes one video per
+test**, so every app screening is side-only and correctly reports `no_front_clip` until a
+second-clip upload is built.
+
+**The report UI.** Both the Report tab and the screening detail now build from one helper,
+`buildAssessmentGroups` in `fms.ts`, reading the screening's own `checkAssessment`.
+Before this the Report tab built its gap list from the per-test spec (`report.tsx`
+previously said so in a comment), so every screening of a movement showed identical
+gaps whatever footage it had. Three tiers:
+1. **Assessed · N checks**: the measurements with their threshold chips.
+2. **Not assessed for this screening**: can differ between screenings, each with its
+   reason.
+3. **Not measured by this system**: same for every screening, kept apart so tier 2 only
+   holds what genuinely differs.
+
+A **Footage** line states side-only vs side + front, and whether that front clip was axial.
+Results stored before this fall back to `measurements.notAssessed`, since all of those were
+side-view uploads. The old spec-driven `buildPendingRows` was removed.
+
+**Verified 18–19 Sep 2026.**
+- Neutrality: HEAD vs working tree over all 146 cached clips, diffing the whole
+  measurement dict and not just score and faults. **0 score changes, 0 fault changes, 0
+  side / final-score changes.** Deep Squat, Hurdle Step, Shoulder Mobility and Push-Up
+  are identical down to the measurement dict. Exactly 3 measurement dicts changed, all
+  expected: S1 lunge, S1 rotary, S7 rotary gained their front-view value.
+- Tests: `test_fms_scoring.py` 31 → **42**, each new gate mutation-checked. Disabling the
+  axial, confidence or side-view gate makes the new tests fail.
+- UI: `tsc --noEmit` clean. Rendered on the running app with Sample 1's results stored
+  under Test Patient: Inline Lunge showed *Assessed · 4* (incl. "Pelvic shift (front view)
+  0.062 torso ✓ … > 0.150 torso (provisional)"), *Not assessed for this screening · 1*
+  (knee alignment with its reason), *Not measured by this system · 2* (ankles). Anita
+  Rao's older stored results rendered through the fallback with "Side view only — needs
+  a front-view clip". Screenshots could not be captured (the browser pane was not
+  drawing), so the check was on page text.
+
+**Known display gap, found during that render, predates this work:** Anita Rao's Push-Up
+result was stored before the 9 Sep push-up key rename (`60963ba`), so it shows *Assessed ·
+1 check*. Its body-line and knee values sit under the old keys the new spec no longer
+names. Re-scoring old push-up results, or mapping the old keys, would fix it.
 
 ---
 
@@ -628,6 +760,14 @@ tests. Two more assert the declared numbers are the ones actually applied.
 diffed against `all_samples_report.json`: **0 score changes, 0 fault changes, 0 measurement
 changes**, 126/126 matched.
 
+### Per-screening check assessment (added 17–19 Sep 2026)
+
+The report's gap list is now per screening, not per test, in three tiers: Assessed / Not
+assessed for this screening / Not measured by this system. Both screens use one helper,
+`buildAssessmentGroups`. Full account in §7, "Front-view footage and per-screening
+assessment". The subsection below describes the earlier, spec-driven version of this
+section, which it replaced.
+
 ### Pending checks shown as targets (added 6 Sep 2026)
 
 The Report tab's "Not assessed" grey chips are replaced by a **"Not yet assessed"** section
@@ -843,6 +983,21 @@ once the department signs the numbers off — that is when the distinction start
 3. **Manual FMS score comparison.** The department is producing manually-scored results
    for comparison against the automated scores. Nothing to do until those arrive; when
    they do, the comparison is the real validation of every threshold in section 5.
+
+3a. **Front-view footage: what the department still needs to supply (as of 19 Sep 2026).**
+   See §7 "Front-view footage and per-screening assessment" for the numbers.
+   - **ASLR:** reshoot with the Rotary #3/#7 setup (high, beside the person, angled
+     down). None of the three WhatsApp ASLR test clips used it.
+   - **Push-Up:** the WhatsApp test clip was head-on. Film from the side.
+   - **One short full-resolution test clip** of the new ASLR setup before the full
+     session, so hip confidence can be checked above 0.6 without WhatsApp compression.
+   - **Calibration clips** for the two provisional thresholds: a lunge with a genuine
+     loss of balance, and a rotary attempt with a genuine shoulder drop. Until then
+     `> 0.15` torso and `> 25°` are guesses, and marked as such.
+   - When the re-filmed footage lands: pose-extract it into `tracked_frontview/`, add the
+     samples to `ACCEPTED_FRONT_CLIPS`, and build validated measurements for
+     `pelvis_lift_or_rotation` and `shoulder_or_pelvis_rotation`. Correct footage alone
+     will only move those to `no_valid_measurement`.
 
 ### Pending decisions
 
@@ -1165,7 +1320,7 @@ once the department signs the numbers off — that is when the distinction start
    from plain PyPI; no `--extra-index-url` is needed.
 
 10. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
-   **31 tests** with the threshold, side-splitting and declared-side work (section 12), which now guard the declared
+   **42 tests** with the threshold, side-splitting, declared-side and per-screening assessment work (sections 7 and 12), which now guard the declared
    thresholds against the scoring code and asserts that pending checks can never be
    evaluated. Still missing: per-fault behavioural coverage for
    the other six tests — only the deep squat's depth fault is exercised end to end — and

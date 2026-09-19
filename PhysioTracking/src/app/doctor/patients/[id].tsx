@@ -9,6 +9,7 @@ import { PatientViewSwitch } from '@/components/patient-view-switch';
 import { useAuth } from '@/context/auth-context';
 import { API_BASE_URL, fetchPatientResults, fetchThresholds, setManualScore } from '@/lib/api';
 import {
+  buildAssessmentGroups,
   buildMeasurementRows,
   faultSummary,
   formatFault,
@@ -260,17 +261,48 @@ export default function PatientDetailScreen() {
                         ))
                       )}
 
-                      {Array.isArray(row.result.measurements?.notAssessed) &&
-                      (row.result.measurements.notAssessed as string[]).length > 0 ? (
-                        <>
-                          <Text style={styles.detailTitle}>Not assessed from this view</Text>
-                          {(row.result.measurements.notAssessed as string[]).map((item) => (
-                            <Text key={item} style={styles.notAssessed}>
-                              • {formatFault(item)}
-                            </Text>
-                          ))}
-                        </>
-                      ) : null}
+                      {(() => {
+                        // Same grouping the Report tab uses, from this
+                        // screening's own stored assessment.
+                        const groups = buildAssessmentGroups(
+                          row.result.test,
+                          row.result,
+                          thresholds.find((spec) => spec.testId === row.result.test),
+                        );
+                        return (
+                          <>
+                            {groups.footage ? (
+                              <Text style={styles.detailLine}>Footage · {groups.footage}</Text>
+                            ) : null}
+                            {groups.notAssessed.length > 0 ? (
+                              <>
+                                <Text style={styles.detailTitle}>
+                                  Not assessed for this screening
+                                </Text>
+                                {groups.notAssessed.map((item) => (
+                                  <Text key={item.key} style={styles.notAssessed}>
+                                    • {item.label}
+                                    <Text style={styles.gapReason}> — {item.reason}</Text>
+                                  </Text>
+                                ))}
+                              </>
+                            ) : null}
+                            {groups.systemLimits.length > 0 ? (
+                              <>
+                                <Text style={[styles.detailTitle, styles.detailTitleMuted]}>
+                                  Not measured by this system (same for every screening)
+                                </Text>
+                                {groups.systemLimits.map((item) => (
+                                  <Text key={item.key} style={styles.notAssessed}>
+                                    • {item.label}
+                                    <Text style={styles.gapReason}> — {item.reason}</Text>
+                                  </Text>
+                                ))}
+                              </>
+                            ) : null}
+                          </>
+                        );
+                      })()}
 
                       <Text style={styles.detailTitle}>Measurements</Text>
 
@@ -412,6 +444,8 @@ const styles = StyleSheet.create({
   detailTitle: { fontSize: 13, fontWeight: '700', color: '#334155', marginTop: 8 },
   fault: { fontSize: 14, color: '#dc5f5f', lineHeight: 20 },
   notAssessed: { fontSize: 14, color: '#94a3b8', lineHeight: 20 },
+  gapReason: { fontSize: 12, color: '#a8b4c0' },
+  detailTitleMuted: { color: '#94a3b8' },
   measurement: {
     paddingVertical: 7,
     borderBottomWidth: 1,

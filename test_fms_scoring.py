@@ -268,7 +268,7 @@ class ThresholdDeclarationTests(unittest.TestCase):
         stored = {
             "deep_squat": {"kneeAngle", "hipAngle", "trunkLeanDeg", "kneeMedialOffset"},
             "hurdle_step": {"kneeAngle", "hipAngle", "stepHeightNorm", "pelvisTiltNorm", "kneeOffsetAbs"},
-            "inline_lunge": {"kneeAngle", "hipAngle", "trunkLeanDeg"},
+            "inline_lunge": {"kneeAngle", "hipAngle", "trunkLeanDeg", "frontPelvisShiftNorm"},
             "shoulder_mobility": set(),
             "active_straight_leg_raise": {
                 "raisedHipAngle",
@@ -282,7 +282,7 @@ class ThresholdDeclarationTests(unittest.TestCase):
                 "supportMinKneeAngle",
                 "supportBodyLineErrorNorm",
             },
-            "rotary_stability": {"elbowKneeDistanceNorm"},
+            "rotary_stability": {"elbowKneeDistanceNorm", "frontShoulderTiltDeg"},
         }
         for test_id, checks in THRESHOLDS.items():
             for check in checks:
@@ -575,6 +575,138 @@ class TrunkStabilityPushupTests(unittest.TestCase):
         self.assertIsNone(check.measurement, "a pending check must expose no number")
         self.assertTrue(check.reason)
         self.assertIn("hand_position", self.score(pushup_frames())["measurements"]["notAssessed"])
+
+
+# Front-view clips with the camera geometry set exactly. make_frame's defaults
+# put hip width at 30px against an 80px torso: 0.375, squarely frontal.
+FRONTAL = {}
+# Torso squashed to 10px with hips 80px apart - the head/feet-end signature.
+AXIAL = {
+    "left_shoulder": (70, 120), "right_shoulder": (130, 120),
+    "left_hip": (60, 130), "right_hip": (140, 130),
+}
+# Hips nearly coincident, as when a side-view clip is supplied as a front view.
+SIDE_ON = {"left_hip": (99, 130), "right_hip": (101, 130)}
+# Feet displaced well clear of the pelvis: 40px against an 80px torso.
+SHIFTED_BASE = {"left_ankle": (45, 250), "right_ankle": (75, 250)}
+
+
+def clip(overrides=None, count=20):
+    return [make_frame(dict(overrides or {}), frame=index) for index in range(count)]
+
+
+def tilted_shoulders(degrees):
+    rad = np.radians(degrees)
+    dx, dy = 20 * np.cos(rad), 20 * np.sin(rad)
+    return {"left_shoulder": (100 - dx, 50 + dy), "right_shoulder": (100 + dx, 50 - dy)}
+
+
+def by_key(result):
+    return {entry["key"]: entry for entry in result["checkAssessment"]}
+
+
+class CheckAssessmentTests(unittest.TestCase):
+    """Which optional checks ran for ONE screening, and why not.
+
+    Two screenings of the same movement can now differ - one with a usable
+    front-view clip, one without - so the reason has to be stored per result
+    and decided from what the footage measurably is.
+    """
+
+    def score(self, test_id, front=None, side=None):
+        return FMSScorer().score(test_id, side or clip(), front_frames=front)
+
+    def test_front_view_is_classified_by_what_the_camera_saw(self):
+        self.assertEqual(fms_scoring.classify_front_view(clip(FRONTAL)), "frontal")
+        self.assertEqual(fms_scoring.classify_front_view(clip(AXIAL)), "axial")
+        self.assertEqual(fms_scoring.classify_front_view(clip(SIDE_ON)), "side")
+        self.assertIsNone(fms_scoring.classify_front_view(None))
+
+    def test_without_a_front_clip_nothing_moves(self):
+        """The neutrality guard: side-only screenings keep their old stored shape."""
+        result = self.score("rotary_stability")
+        entries = by_key(result)
+        self.assertIsNone(result["frontView"])
+        for key in ("shoulder_or_pelvis_rotation", "shoulder_lowering"):
+            self.assertEqual(entries[key]["status"], fms_scoring.NOT_ASSESSED)
+            self.assertEqual(entries[key]["reason"], fms_scoring.REASON_NO_FRONT_CLIP)
+        self.assertEqual(
+            result["measurements"]["notAssessed"],
+            ["shoulder_or_pelvis_rotation", "shoulder_lowering"],
+        )
+        self.assertNotIn("frontShoulderTiltDeg", result["measurements"])
+        self.assertNotIn("shoulder_lowering", result["faults"])
+
+    def test_unmeasurable_checks_are_a_system_limit_for_everyone(self):
+        pushup = by_key(self.score("trunk_stability_pushup"))
+        self.assertEqual(pushup["hand_position"]["reason"], fms_scoring.REASON_SYSTEM_LIMIT)
+        lunge = by_key(self.score("inline_lunge", front=clip(FRONTAL)))
+        # A good front clip does not change an ankle the pose model cannot see.
+        self.assertEqual(
+            lunge["lead_ankle_dorsiflexion"]["reason"], fms_scoring.REASON_SYSTEM_LIMIT
+        )
+
+    def test_head_end_camera_blocks_hip_checks_but_not_the_shoulder_line(self):
+        result = self.score("rotary_stability", front=clip(AXIAL))
+        entries = by_key(result)
+        self.assertEqual(result["frontView"], "axial")
+        self.assertEqual(
+            entries["shoulder_or_pelvis_rotation"]["reason"], fms_scoring.REASON_FRONT_CLIP_AXIAL
+        )
+        self.assertEqual(entries["shoulder_lowering"]["status"], fms_scoring.ASSESSED)
+        self.assertIn("frontShoulderTiltDeg", result["measurements"])
+        self.assertEqual(result["measurements"]["notAssessed"], ["shoulder_or_pelvis_rotation"])
+
+    def test_weak_tracking_is_reported_as_low_confidence(self):
+        front = clip(FRONTAL)
+        for frame in front:
+            for name in ("left_shoulder", "right_shoulder"):
+                frame.scores[KP[name]] = 0.4  # visible, but below the 0.6 bar
+        entries = by_key(self.score("rotary_stability", front=front))
+        self.assertEqual(entries["shoulder_lowering"]["reason"], fms_scoring.REASON_LOW_CONFIDENCE)
+
+    def test_side_clip_labelled_front_counts_as_no_front_clip(self):
+        result = self.score("rotary_stability", front=clip(SIDE_ON))
+        self.assertEqual(result["frontView"], "side")
+        self.assertEqual(
+            by_key(result)["shoulder_lowering"]["reason"], fms_scoring.REASON_NO_FRONT_CLIP
+        )
+
+    def test_good_footage_without_a_valid_measurement_says_so(self):
+        """Knee alignment: the footage is fine, the lunge measurement is what's missing."""
+        entries = by_key(self.score("inline_lunge", front=clip(FRONTAL)))
+        self.assertEqual(
+            entries["knee_alignment_compensation"]["reason"],
+            fms_scoring.REASON_NO_VALID_MEASUREMENT,
+        )
+        self.assertEqual(entries["balance_or_pelvis_shift"]["status"], fms_scoring.ASSESSED)
+
+    def test_shoulder_drop_fires_only_when_the_front_clip_shows_it(self):
+        front = clip(FRONTAL, count=16) + [make_frame(tilted_shoulders(40), frame=i) for i in range(16, 24)]
+        with_front = self.score("rotary_stability", front=front)
+        self.assertIn("shoulder_lowering", with_front["faults"])
+        self.assertGreater(with_front["measurements"]["frontShoulderTiltDeg"], 25.0)
+        self.assertNotIn("shoulder_lowering", self.score("rotary_stability")["faults"])
+
+    def test_pelvic_shift_off_the_base_fires(self):
+        result = self.score("inline_lunge", front=clip(SHIFTED_BASE))
+        self.assertIn("loss_of_balance_pelvic_shift", result["faults"])
+        steady = self.score("inline_lunge", front=clip(FRONTAL))
+        self.assertNotIn("loss_of_balance_pelvic_shift", steady["faults"])
+
+    def test_front_clip_is_ignored_for_tests_without_front_checks(self):
+        side = clip()
+        without = FMSScorer().score("deep_squat", side)
+        with_front = FMSScorer().score("deep_squat", side, front_frames=clip(FRONTAL))
+        self.assertIsNone(with_front["frontView"])
+        self.assertEqual(without, with_front)
+
+    def test_provisional_thresholds_are_served_as_such(self):
+        spec = {c["key"]: c for e in threshold_spec()["tests"] for c in e["checks"]}
+        self.assertTrue(spec["shoulder_lowering"]["provisional"])
+        self.assertTrue(spec["balance_or_pelvis_shift"]["provisional"])
+        self.assertTrue(spec["knee_alignment_compensation"]["frontView"])
+        self.assertFalse(spec["hand_position"]["frontView"])
 
 
 if __name__ == "__main__":

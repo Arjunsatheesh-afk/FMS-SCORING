@@ -380,6 +380,17 @@ re-extraction.
 Folder names are mapped to test ids with `normalize_test_name`, plus a small
 repair step for dataset-specific spellings (`ROTATORY STABILITY`,
 `Incline Lunge`, `Straight Leg Rise`) that would otherwise fail to match.
+Anything calling `normalize_test_name` directly skips those two folders; use
+`run_all_samples.resolve_test_id`.
+
+**Front-view clips.** Inline Lunge, ASLR and Rotary Stability can also take a
+second clip of the same attempt filmed from the front, which lets some
+frontal-plane checks run. Which clips are accepted is an explicit manifest,
+`ACCEPTED_FRONT_CLIPS` in `run_all_samples.py` (currently Sample 1 for all three
+tests and Sample 7 for ASLR and Rotary). Front clips are pose-extracted
+separately into `fms_outputs/tracked_frontview/<test_id>/Sample-N.json`; the
+batch runner scores them but does not extract them. `score_tracked_file` takes
+the path as `front_tracked_json=`.
 
 ### Known limitation: prototype-only default passwords
 
@@ -411,14 +422,54 @@ Some checks could not be fixed, only removed. Valgus and pelvic/shoulder
 obliquity are frontal-plane quantities: filmed from the side, the axis they are
 measured along points at the camera, so the compensation is confounded with
 rotation rather than merely noisy. No 2D formula recovers it. Those checks were
-dropped for the tests filmed sagittally, and each dropped check is listed in
-`measurements.notAssessed` in the scoring output, with the reasoning in the
-commit message for `2a59c37`.
+dropped for the tests filmed sagittally, with the reasoning in the commit
+message for `2a59c37`.
 
 As a result **inline lunge and rotary stability retain fewer checks than the FMS
 defines**, so most attempts now pass what remains and their scores read high.
 Treat those two as provisional until frontal-camera footage or 3D pose
 estimation is available; they are not clinically meaningful as they stand.
+
+#### Which checks ran is recorded per screening
+
+A front-view clip, when supplied, lets some of those checks run. So two
+screenings of the same movement can now differ in which checks were judged.
+Every result therefore carries `checkAssessment`: for each optional check,
+`evaluated` or `not_assessed` with a reason decided from the footage itself.
+
+| Reason | Meaning |
+|---|---|
+| `no_front_clip` | No front clip, or the one supplied measured as a side view |
+| `front_clip_axial` | The front clip was filmed from the head or feet end, where the hips are not reliably tracked |
+| `low_confidence` | The check's own landmarks tracked below 0.6 confidence, or on under 95% of frames |
+| `no_valid_measurement` | The footage is fine, but no validated measurement exists for the check yet |
+| `system_limit` | Never measurable with this pose model (ankle angles, push-up hand position) |
+
+The camera is classified from the clip, never from its file name: median
+hip-width ÷ torso length. Side views measure below 0.22; head- or feet-end views
+measure 0.9 and above. `frontView` on the result records which it was.
+`measurements.notAssessed` is still written, minus whatever ran, for older
+readers.
+
+The doctor's report reads `checkAssessment`, not the per-test spec. It shows
+three tiers per screening:
+- **Assessed**
+- **Not assessed for this screening**, each with its reason
+- **Not measured by this system**, identical for every screening
+
+It also shows a footage line: side view only, or side + front. Results stored
+before this existed fall back to `measurements.notAssessed`.
+
+Two front-view checks currently run, both with **provisional thresholds** that
+the report marks as such: Inline Lunge pelvic shift (`> 0.15` torso) and Rotary
+shoulder lowering (`> 25°`). No labelled clips exist to calibrate them. Inline
+Lunge knee alignment stays off even with good frontal footage. The squat's
+knee-alignment geometry reads a correctly aligned lead knee as inward in an
+in-line stance. See `PROJECT_STATUS.md` §7 for the measurements behind each
+decision.
+
+The app's upload flow still takes one video per test, so screenings uploaded
+through the app are side-view only.
 
 **Deep squat, hurdle step, and shoulder mobility do not have this limitation** —
 they are filmed frontally, keep their full set of checks, and their scores can

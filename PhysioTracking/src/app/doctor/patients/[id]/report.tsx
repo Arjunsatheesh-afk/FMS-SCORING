@@ -9,8 +9,9 @@ import { fetchPatientResults, fetchThresholds } from '@/lib/api';
 import {
   ReportRow,
   SIDE_SPLIT_TESTS,
+  PendingRow,
+  buildAssessmentGroups,
   buildMeasurementRows,
-  buildPendingRows,
   buildReportRows,
   formatFault,
   rawSubtotal,
@@ -173,10 +174,12 @@ function ReportRowView({
   const measurementRows = screening
     ? buildMeasurementRows(row.testId, screening.result.measurements, thresholds)
     : [];
-  // Driven by the served spec rather than the stored notAssessed array: the
-  // spec is complete (it also covers the joints never measured at all) and it
-  // carries the department's target and the reason for each gap.
-  const pendingRows = buildPendingRows(thresholds?.checks ?? []);
+  // Driven by THIS screening's stored assessment, not the per-test spec: two
+  // screenings of one movement can differ (a front-view clip or not), and a
+  // reviewer comparing them must see that difference with its reason.
+  const groups = screening
+    ? buildAssessmentGroups(row.testId, screening.result, thresholds)
+    : null;
 
   return (
     <View style={styles.row}>
@@ -274,7 +277,14 @@ function ReportRowView({
                 </>
               ) : null}
 
-              <Text style={styles.detailLabel}>Measurements &amp; thresholds</Text>
+              {groups?.footage ? (
+                <Text style={styles.footageLine}>Footage · {groups.footage}</Text>
+              ) : null}
+
+              <Text style={styles.detailLabel}>
+                Assessed · {groups?.assessedCount ?? 0}{' '}
+                {groups?.assessedCount === 1 ? 'check' : 'checks'}
+              </Text>
               {measurementRows.map((measurement) => (
                 <View key={measurement.key} style={styles.measurement}>
                   <View style={styles.measurementTop}>
@@ -321,28 +331,27 @@ function ReportRowView({
                 </View>
               )}
 
-              {pendingRows.length > 0 ? (
+              {groups && groups.notAssessed.length > 0 ? (
                 <>
                   <Text style={styles.detailLabel}>
-                    Not yet assessed · {pendingRows.length}
+                    Not assessed for this screening · {groups.notAssessed.length}
                   </Text>
-                  {pendingRows.map((item) => (
-                    <View key={item.key} style={styles.measurement}>
-                      <View style={styles.measurementTop}>
-                        <Text style={[styles.measurementKey, styles.measurementKeyMuted]}>
-                          {item.label}
-                        </Text>
-                        {/* Occupies the slot a reading would, but can never be
-                            mistaken for one. No value is invented. */}
-                        <Text style={styles.notMeasured}>not measured</Text>
-                      </View>
-                      <View style={styles.chipRow}>
-                        <Text style={item.target ? styles.targetChip : styles.noTargetChip}>
-                          {item.target ? `target ${item.target}` : 'no target provided'}
-                        </Text>
-                        <Text style={styles.reasonChip}>{item.reason}</Text>
-                      </View>
-                    </View>
+                  {groups.notAssessed.map((item) => (
+                    <GapRow key={item.key} item={item} />
+                  ))}
+                </>
+              ) : null}
+
+              {groups && groups.systemLimits.length > 0 ? (
+                <>
+                  <Text style={[styles.detailLabel, styles.detailLabelMuted]}>
+                    Not measured by this system · {groups.systemLimits.length}
+                  </Text>
+                  {/* Kept apart so the list above holds only what genuinely
+                      differs between screenings of this movement. */}
+                  <Text style={styles.groupNote}>Same for every screening of this movement.</Text>
+                  {groups.systemLimits.map((item) => (
+                    <GapRow key={item.key} item={item} muted />
                   ))}
                 </>
               ) : null}
@@ -384,6 +393,26 @@ function ReportRowView({
 }
 
 /** 'left' -> 'Left leg'; 'first'/'second' -> 'First half' where no limb is named. */
+/** One check that did not run, with its target and the reason. */
+function GapRow({ item, muted = false }: { item: PendingRow; muted?: boolean }) {
+  return (
+    <View style={[styles.measurement, muted && styles.gapMuted]}>
+      <View style={styles.measurementTop}>
+        <Text style={[styles.measurementKey, styles.measurementKeyMuted]}>{item.label}</Text>
+        {/* Occupies the slot a reading would, but can never be mistaken for
+            one. No value is invented. */}
+        <Text style={styles.notMeasured}>not measured</Text>
+      </View>
+      <View style={styles.chipRow}>
+        <Text style={item.target ? styles.targetChip : styles.noTargetChip}>
+          {item.target ? `target ${item.target}` : 'no target provided'}
+        </Text>
+        <Text style={styles.reasonChip}>{item.reason}</Text>
+      </View>
+    </View>
+  );
+}
+
 function sideLabel(label: string) {
   if (label === 'left' || label === 'right') {
     return `${label.charAt(0).toUpperCase()}${label.slice(1)} leg`;
@@ -508,6 +537,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 3,
   },
+  detailLabelMuted: { color: '#a8b4c0' },
+  footageLine: { fontSize: 12, color: '#475569', fontWeight: '600', marginTop: 2 },
+  groupNote: { fontSize: 11, color: '#a8b4c0', marginBottom: 2 },
+  gapMuted: { opacity: 0.7 },
   emptyDetail: { fontSize: 14, color: '#64748b', paddingTop: 4 },
 
   measurement: {

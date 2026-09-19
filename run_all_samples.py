@@ -43,6 +43,31 @@ SAMPLE_PATTERN = re.compile(r"^sample[\s_-]*(\d+)$", re.IGNORECASE)
 # an alias, so normalize_test_name() resolves the full folder name first. It is
 # kept because it costs nothing and still catches partial spellings that the
 # alias would miss.
+# Front-view clips accepted into scoring, by sample. This is a scope decision,
+# not a quality one - the scorer still judges every accepted clip per check and
+# records why a check did not run. Samples 1 and 7 keep their existing footage
+# permanently. Samples 2 and 9 also have front clips on disk (the earlier
+# head/feet-end attempt) but are left out: their ASLR and Rotary footage is
+# being re-filmed, and nothing was approved for their lunge clips.
+# Front clips are pose-extracted separately into tracked_frontview/.
+ACCEPTED_FRONT_CLIPS: dict[int, tuple[str, ...]] = {
+    1: ("inline_lunge", "active_straight_leg_raise", "rotary_stability"),
+    7: ("active_straight_leg_raise", "rotary_stability"),
+}
+
+
+def front_tracked_json(tracked_json: Path, test_id: str, sample_number: int) -> Path | None:
+    """The accepted front-view tracking for this clip, if there is one."""
+    if test_id not in ACCEPTED_FRONT_CLIPS.get(sample_number, ()):
+        return None
+    # tracked_json is <output>/tracked/<test>/<stem>.json
+    path = tracked_json.parents[2] / "tracked_frontview" / test_id / tracked_json.name
+    if not path.exists():
+        print(f"  ! accepted front clip missing, scoring side view only: {path}")
+        return None
+    return path
+
+
 NAME_REPAIRS = (
     ("rotatory", "rotary"),
     ("incline lunge", "inline lunge"),
@@ -361,6 +386,9 @@ def main() -> int:
                     task.test_id,
                     hand_length_in=args.hand_length_in,
                     shoulder_width_in=args.shoulder_width_in,
+                    front_tracked_json=front_tracked_json(
+                        task.tracked_json, task.test_id, task.sample.number
+                    ),
                 )
             except Exception as exc:
                 elapsed = time.time() - video_started
@@ -393,6 +421,8 @@ def main() -> int:
                     "maxScore": result.get("maxScore"),
                     "faults": faults,
                     "measurements": result.get("measurements", {}),
+                    "checkAssessment": result.get("checkAssessment"),
+                    "frontView": result.get("frontView"),
                     "confidence": result.get("confidence"),
                     "status": result.get("status"),
                     "sourceFolder": task.folder.name,
