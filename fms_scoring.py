@@ -149,6 +149,12 @@ class Check:
     # shoulder line lies across the image from the head end, so shoulder
     # lowering can still be read there while anything needing the hips cannot.
     front_view_sensitive: bool = True
+    # The camera placements this check's measurement and threshold were
+    # calibrated on. A usable clip from any other placement is reported as
+    # no_valid_measurement rather than judged: Sample 9's elevated rotary clip
+    # read 33.7 degrees of "shoulder tilt" against a cut set on head-end views,
+    # while two correct elevated-view clips of normal movement read 11 and 28.
+    front_views: tuple[str, ...] = ("frontal", "axial")
     # A threshold chosen without labelled clips to calibrate it against. The
     # report marks it so, rather than presenting a guess as a validated cutoff.
     provisional: bool = False
@@ -282,7 +288,10 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
             "torso",
             "loss_of_balance_pelvic_shift",
             front_landmarks=("left_hip", "right_hip", "left_ankle", "right_ankle"),
+            front_views=("frontal",),
             provisional=True,
+            reason="calibrated only on a camera facing the subject; not validated for "
+            "this camera placement",
         ),
         Check(
             "lead_ankle_dorsiflexion",
@@ -404,7 +413,13 @@ THRESHOLDS: dict[str, tuple[Check, ...]] = {
             "shoulder_lowering",
             front_landmarks=("left_shoulder", "right_shoulder"),
             front_view_sensitive=False,
+            # Head-end views only. From the elevated side/behind view normal
+            # arm-lift already reads 11-28 degrees, and a subject who turns round
+            # mid-clip shifts the reference angle; neither is calibrated yet.
+            front_views=("axial",),
             provisional=True,
+            reason="threshold calibrated only on head-end camera views; from an elevated "
+            "camera, normal arm-lift alone reads 11-28 degrees, so it is not yet valid here",
         ),
     ),
 }
@@ -515,7 +530,7 @@ def assess_checks(
                 confidence, usable = _landmark_quality(front_frames, check.front_landmarks)
                 if confidence < FRONT_MIN_LANDMARK_CONFIDENCE or usable < FRONT_MIN_USABLE_SHARE:
                     reason = REASON_LOW_CONFIDENCE
-                elif check.pending:
+                elif check.pending or view not in check.front_views:
                     reason = REASON_NO_VALID_MEASUREMENT
                 else:
                     entries.append({"key": check.key, "status": ASSESSED, "reason": None})
@@ -580,11 +595,23 @@ def _front_shoulder_tilt_deg(frames: list["FMSFrame"]) -> float | None:
         delta = left - right
         angle = math.degrees(math.atan2(delta[1], delta[0])) % 180.0
         orientation.append(angle - 180.0 if angle > 90.0 else angle)
-    smoothed = [v for v in _median_filter(orientation, _FRONT_SMOOTH) if v is not None]
-    if not smoothed:
+    # Orientations are circular with period 180 degrees. Filtering, averaging
+    # and differencing them as plain numbers breaks wherever the line sits
+    # near vertical in the image, where jitter flips it between +89 and -89:
+    # Sample 9's elevated rotary clip, filmed from behind at an angle, read a
+    # physically impossible 138.6 degrees that way. So the series is unwrapped
+    # before filtering, the usual angle is a doubled-angle circular mean, and
+    # each deviation is the shortest turn between two orientations.
+    known = [v for v in orientation if v is not None]
+    if not known:
         return None
-    usual = float(np.median(smoothed))
-    return float(np.percentile([abs(v - usual) for v in smoothed], _FRONT_SUMMARY_PERCENTILE))
+    unwrapped = iter(np.degrees(np.unwrap(np.radians(np.array(known) * 2.0))) / 2.0)
+    continuous = [None if v is None else float(next(unwrapped)) for v in orientation]
+    smoothed = np.array([v for v in _median_filter(continuous, _FRONT_SMOOTH) if v is not None])
+    doubled = np.radians(smoothed * 2.0)
+    usual = math.degrees(math.atan2(float(np.mean(np.sin(doubled))), float(np.mean(np.cos(doubled))))) / 2.0
+    deviation = np.abs((smoothed - usual + 90.0) % 180.0 - 90.0)
+    return float(np.percentile(deviation, _FRONT_SUMMARY_PERCENTILE))
 
 
 # Tests with at least one check that needs a front view. Only these accept one.

@@ -46,13 +46,19 @@ SAMPLE_PATTERN = re.compile(r"^sample[\s_-]*(\d+)$", re.IGNORECASE)
 # Front-view clips accepted into scoring, by sample. This is a scope decision,
 # not a quality one - the scorer still judges every accepted clip per check and
 # records why a check did not run. Samples 1 and 7 keep their existing footage
-# permanently. Samples 2 and 9 also have front clips on disk (the earlier
-# head/feet-end attempt) but are left out: their ASLR and Rotary footage is
-# being re-filmed, and nothing was approved for their lunge clips.
-# Front clips are pose-extracted separately into tracked_frontview/.
+# permanently. Sample 9 was re-filmed on 22 Sep 2026 at the corrected elevated
+# angle for ASLR and Rotary (the files named "front view .mp4", with a trailing
+# space - the 13 Sep "front view.mp4" beside them is the old head/feet-end
+# attempt and is not used); its lunge front clip is the 13 Sep one, which was
+# genuinely frontal. Sample 2 has front clips on disk but is left out pending
+# its own re-film.
+# Front clips are pose-extracted separately into tracked_frontview/. Sample 9's
+# ASLR front clip was extracted with orient_upright=True: the subject lies
+# across the frame, and without it 45% of the first leg lost the hips.
 ACCEPTED_FRONT_CLIPS: dict[int, tuple[str, ...]] = {
     1: ("inline_lunge", "active_straight_leg_raise", "rotary_stability"),
     7: ("active_straight_leg_raise", "rotary_stability"),
+    9: ("inline_lunge", "active_straight_leg_raise", "rotary_stability"),
 }
 
 

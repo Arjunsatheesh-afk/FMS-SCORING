@@ -392,6 +392,16 @@ separately into `fms_outputs/tracked_frontview/<test_id>/Sample-N.json`; the
 batch runner scores them but does not extract them. `score_tracked_file` takes
 the path as `front_tracked_json=`.
 
+For a subject lying across the frame (e.g. an elevated ASLR view), extract with
+`extract_video_pose(..., orient_upright=True)`. It turns each frame so the head
+points up before detection and maps the keypoints back. RTMPose otherwise loses
+the hips on a large share of such frames. It is off by default and not yet
+applied to side-view clips; see `PROJECT_STATUS.md` §13 item 0.
+
+Each front-view check also declares `front_views`, the camera placements its
+threshold was calibrated on. A usable clip from any other placement is reported
+as `no_valid_measurement` rather than judged.
+
 ### Known limitation: prototype-only default passwords
 
 Every account is created with the password `<mobile number>.physio` (for

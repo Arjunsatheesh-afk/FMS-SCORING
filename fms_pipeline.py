@@ -23,6 +23,7 @@ import numpy as np
 from fms_scoring import (
     FMSScorer,
     FMS_TESTS,
+    KP,
     compute_angles,
     normalize_test_name,
     summarize_screen,
@@ -93,7 +94,15 @@ def extract_video_pose(
     live: bool = True,
     window_name: str = "FMS Live Tracking",
     progress_callback: Callable[[int, int], None] | None = None,
+    orient_upright: bool = False,
 ) -> Path:
+    """Track one video to JSON.
+
+    `orient_upright` turns each frame so a subject lying across it is upright
+    before detection - see _detect_upright. Off by default: it is currently
+    used only for front-view clips, pending a before/after re-score of every
+    horizontal-body side-view clip (PROJECT_STATUS.md, §13).
+    """
     if output_json.exists() and not overwrite:
         if live:
             print(f"[fms_pipeline] Using cached tracking: {output_json}")
@@ -109,6 +118,7 @@ def extract_video_pose(
             live=live,
             window_name=window_name,
             progress_callback=progress_callback,
+            orient_upright=orient_upright,
         )
     except Exception as exc:
         if detector is not None or device == "cpu" or not _looks_like_cuda_runtime_failure(exc):
@@ -123,6 +133,7 @@ def extract_video_pose(
             live=live,
             window_name=window_name,
             progress_callback=progress_callback,
+            orient_upright=orient_upright,
         )
 
     output = {
@@ -146,6 +157,7 @@ def _run_pose_extraction(
     live: bool,
     window_name: str,
     progress_callback: Callable[[int, int], None] | None = None,
+    orient_upright: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     import cv2
     from rtmlib import draw_skeleton
@@ -161,6 +173,9 @@ def _run_pose_extraction(
 
     smoothed_kps: np.ndarray | None = None
     smoothed_angles: dict[str, float | None] = {}
+    # Last confidently seen shoulder-minus-hip vector, in original coordinates;
+    # it picks the rotation for the next frame when orient_upright is on.
+    head_axis: np.ndarray | None = None
     track = []
     frame_idx = 0
     interrupted = False
@@ -177,7 +192,11 @@ def _run_pose_extraction(
             if progress_callback is not None:
                 progress_callback(frame_idx, total_frames)
 
-            keypoints, scores = local_detector(frame)
+            rotation = ROTATE_NONE
+            if orient_upright:
+                keypoints, scores, rotation = _detect_upright(cv2, local_detector, frame, head_axis)
+            else:
+                keypoints, scores = local_detector(frame)
             if keypoints is None or len(keypoints) == 0:
                 if live:
                     _show_live_frame(
@@ -198,6 +217,11 @@ def _run_pose_extraction(
             person_index = _select_primary_person(keypoints, scores)
             kps = np.asarray(keypoints[person_index], dtype=float)
             sc = np.asarray(scores[person_index], dtype=float)
+            torso_points = [KP[name] for name in ("left_shoulder", "right_shoulder", "left_hip", "right_hip")]
+            if orient_upright and np.all(sc[torso_points] >= SCORE_THR):
+                head_axis = (kps[torso_points[0]] + kps[torso_points[1]]) / 2.0 - (
+                    kps[torso_points[2]] + kps[torso_points[3]]
+                ) / 2.0
 
             if smoothed_kps is None:
                 smoothed_kps = kps.copy()
@@ -226,6 +250,9 @@ def _run_pose_extraction(
                     "angles": dict(smoothed_angles),
                 }
             )
+            if orient_upright:
+                # Which way the frame was turned before detection, for audit.
+                track[-1]["rotation"] = rotation
 
             if live:
                 annotated = draw_skeleton(
@@ -265,6 +292,8 @@ def _run_pose_extraction(
         "height": height,
         "interrupted": interrupted,
     }
+    if orient_upright:
+        metadata["orient_upright"] = True
     return track, metadata
 
 
@@ -667,6 +696,84 @@ def _show_live_frame(
 def _select_primary_person(keypoints: np.ndarray, scores: np.ndarray) -> int:
     confidences = np.mean(scores, axis=1)
     return int(np.argmax(confidences))
+
+
+# --------------------------------------------------------------------------
+# Upright-oriented detection
+#
+# RTMPose is trained overwhelmingly on upright people. On a subject lying
+# across the frame it is unstable: on Sample 9's elevated ASLR clip, 45% of the
+# head-left frames lost the hips entirely (confidence 0.08-0.26, skeleton
+# collapsed onto the head) while the subject lay still and fully visible.
+# Rotating those same frames so the head points up recovered every one of them
+# to 0.68-0.79, with keypoints verified by eye to land on the body once mapped
+# back. The subject turns around mid-clip, so the rotation is chosen per frame
+# from the body axis seen on the previous one.
+# --------------------------------------------------------------------------
+
+ROTATE_NONE = 0
+ROTATE_CW = 90     # image turned clockwise: a head pointing left ends up on top
+ROTATE_CCW = -90   # image turned counter-clockwise: a head pointing right ends up on top
+# Below this mean keypoint score the chosen orientation is not trusted and the
+# other two are tried as well - which is also how the first frame, and the
+# frames of the turnaround itself, find their way.
+_ORIENT_RETRY_SCORE = 0.5
+
+
+def _rotate_frame(cv2: Any, frame: np.ndarray, rotation: int) -> np.ndarray:
+    if rotation == ROTATE_CW:
+        return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    if rotation == ROTATE_CCW:
+        return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return frame
+
+
+def _unrotate_keypoints(keypoints: np.ndarray, rotation: int, width: int, height: int) -> np.ndarray:
+    """Map keypoints detected on a rotated frame back to original pixel coordinates.
+
+    `width` and `height` are the ORIGINAL frame's. Works on any array whose last
+    axis is (x, y), so every detected person maps back in one call.
+    """
+    points = np.asarray(keypoints, dtype=float)
+    x, y = points[..., 0], points[..., 1]
+    if rotation == ROTATE_CW:       # (x, y) -> (height - 1 - y, x)
+        return np.stack([y, height - 1 - x], axis=-1)
+    if rotation == ROTATE_CCW:      # (x, y) -> (y, width - 1 - x)
+        return np.stack([width - 1 - y, x], axis=-1)
+    return points.copy()
+
+
+def _upright_rotation(head_axis: np.ndarray | None) -> int:
+    """The rotation that puts the head on top, from a shoulder-minus-hip vector."""
+    if head_axis is None or abs(head_axis[0]) <= abs(head_axis[1]):
+        return ROTATE_NONE
+    return ROTATE_CW if head_axis[0] < 0 else ROTATE_CCW
+
+
+def _detect_upright(
+    cv2: Any,
+    detector: Any,
+    frame: np.ndarray,
+    head_axis: np.ndarray | None,
+) -> tuple[np.ndarray | None, np.ndarray | None, int]:
+    """Detect with the subject turned upright; returns keypoints in ORIGINAL coordinates."""
+    height, width = frame.shape[:2]
+    preferred = _upright_rotation(head_axis)
+    order = [preferred] + [r for r in (ROTATE_NONE, ROTATE_CW, ROTATE_CCW) if r != preferred]
+
+    best: tuple[np.ndarray | None, np.ndarray | None, int] = (None, None, ROTATE_NONE)
+    best_score = -1.0
+    for attempt, rotation in enumerate(order):
+        keypoints, scores = detector(_rotate_frame(cv2, frame, rotation))
+        if keypoints is not None and len(keypoints) > 0:
+            quality = float(np.max(np.mean(scores, axis=1)))
+            if quality > best_score:
+                best_score = quality
+                best = (_unrotate_keypoints(keypoints, rotation, width, height), scores, rotation)
+        # Settled orientation: one inference, no extra cost.
+        if attempt == 0 and best_score >= _ORIENT_RETRY_SCORE and head_axis is not None:
+            break
+    return best
 
 
 def _fault_from_filename(stem: str) -> str:

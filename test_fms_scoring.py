@@ -595,10 +595,11 @@ def clip(overrides=None, count=20):
     return [make_frame(dict(overrides or {}), frame=index) for index in range(count)]
 
 
-def tilted_shoulders(degrees):
+def tilted_shoulders(degrees, center=(100, 50), half_width=20):
     rad = np.radians(degrees)
-    dx, dy = 20 * np.cos(rad), 20 * np.sin(rad)
-    return {"left_shoulder": (100 - dx, 50 + dy), "right_shoulder": (100 + dx, 50 - dy)}
+    dx, dy = half_width * np.cos(rad), half_width * np.sin(rad)
+    cx, cy = center
+    return {"left_shoulder": (cx - dx, cy + dy), "right_shoulder": (cx + dx, cy - dy)}
 
 
 def by_key(result):
@@ -682,11 +683,39 @@ class CheckAssessmentTests(unittest.TestCase):
         self.assertEqual(entries["balance_or_pelvis_shift"]["status"], fms_scoring.ASSESSED)
 
     def test_shoulder_drop_fires_only_when_the_front_clip_shows_it(self):
-        front = clip(FRONTAL, count=16) + [make_frame(tilted_shoulders(40), frame=i) for i in range(16, 24)]
+        # Head-end view, the placement the threshold was calibrated on.
+        dropped = dict(AXIAL, **tilted_shoulders(40, center=(100, 120), half_width=30))
+        front = clip(AXIAL, count=16) + [make_frame(dropped, frame=i) for i in range(16, 24)]
         with_front = self.score("rotary_stability", front=front)
         self.assertIn("shoulder_lowering", with_front["faults"])
         self.assertGreater(with_front["measurements"]["frontShoulderTiltDeg"], 25.0)
         self.assertNotIn("shoulder_lowering", self.score("rotary_stability")["faults"])
+
+    def test_threshold_is_not_applied_to_an_uncalibrated_camera_placement(self):
+        """Shoulder lowering is calibrated on head-end views only.
+
+        A good clip from another placement must be reported, not judged -
+        Sample 9's elevated clip would otherwise have taken a false fault.
+        """
+        dropped = tilted_shoulders(40)
+        front = clip(FRONTAL, count=16) + [make_frame(dropped, frame=i) for i in range(16, 24)]
+        result = self.score("rotary_stability", front=front)
+        self.assertEqual(
+            by_key(result)["shoulder_lowering"]["reason"], fms_scoring.REASON_NO_VALID_MEASUREMENT
+        )
+        self.assertNotIn("shoulder_lowering", result["faults"])
+        self.assertNotIn("frontShoulderTiltDeg", result["measurements"])
+
+    def test_near_vertical_shoulder_line_does_not_read_as_a_drop(self):
+        """Jitter around vertical must not wrap into a 180-degree 'tilt'.
+
+        A shoulder line near vertical in the image - an elevated camera behind
+        the subject - flips between +89 and -89 degrees frame to frame. Sample 9
+        read 138.6 degrees and a false fault before orientation was handled as
+        circular.
+        """
+        front = [make_frame(tilted_shoulders(90 + (1.5 if i % 2 else -1.5)), frame=i) for i in range(24)]
+        self.assertLess(fms_scoring._front_shoulder_tilt_deg(front), 5.0)
 
     def test_pelvic_shift_off_the_base_fires(self):
         result = self.score("inline_lunge", front=clip(SHIFTED_BASE))
@@ -707,6 +736,33 @@ class CheckAssessmentTests(unittest.TestCase):
         self.assertTrue(spec["balance_or_pelvis_shift"]["provisional"])
         self.assertTrue(spec["knee_alignment_compensation"]["frontView"])
         self.assertFalse(spec["hand_position"]["frontView"])
+
+
+class UprightOrientationTests(unittest.TestCase):
+    """Detecting on a rotated frame must map every keypoint back exactly."""
+
+    def test_keypoints_map_back_to_their_original_pixel(self):
+        import cv2
+        import fms_pipeline as P
+
+        height, width = 5, 7
+        for rotation, code in ((P.ROTATE_CW, cv2.ROTATE_90_CLOCKWISE),
+                               (P.ROTATE_CCW, cv2.ROTATE_90_COUNTERCLOCKWISE)):
+            for x, y in ((1, 3), (0, 0), (6, 4), (3, 2)):
+                with self.subTest(rotation=rotation, point=(x, y)):
+                    image = np.zeros((height, width), np.uint8)
+                    image[y, x] = 255
+                    ry, rx = np.argwhere(cv2.rotate(image, code) == 255)[0]
+                    back = P._unrotate_keypoints(np.array([[rx, ry]]), rotation, width, height)
+                    np.testing.assert_allclose(back[0], [x, y])
+
+    def test_head_is_turned_to_the_top(self):
+        import fms_pipeline as P
+
+        self.assertEqual(P._upright_rotation(np.array([-100.0, 10.0])), P.ROTATE_CW)
+        self.assertEqual(P._upright_rotation(np.array([100.0, 10.0])), P.ROTATE_CCW)
+        self.assertEqual(P._upright_rotation(np.array([5.0, -100.0])), P.ROTATE_NONE)
+        self.assertEqual(P._upright_rotation(None), P.ROTATE_NONE)
 
 
 if __name__ == "__main__":

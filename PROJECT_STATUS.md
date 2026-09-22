@@ -102,7 +102,7 @@ auth_store.py             SQLite: users, tokens, results. All SQL is here.
 annotate_video.py         Skeleton-overlay renderer (reads cached keypoints, no detector).
 run_all_samples.py        Batch runner over the Dataset/ folder tree.
 seed_accounts.py          Creates the doctor + demo patients.
-test_fms_scoring.py       42 tests: the threshold table guarded against the
+test_fms_scoring.py       46 tests: the threshold table guarded against the
                           scoring code, side splitting, and the declared-side
                           rules. See section 13.
 
@@ -420,6 +420,80 @@ result was stored before the 9 Sep push-up key rename (`60963ba`), so it shows *
 1 check*. Its body-line and knee values sit under the old keys the new spec no longer
 names. Re-scoring old push-up results, or mapping the old keys, would fix it.
 
+### Sample 9 re-filmed footage (22 Sep 2026)
+
+**What is actually new on disk.** SHA-256 over the whole folder showed:
+- ASLR `Side view.mp4` and Rotary `Side view .mp4` are **byte-identical copies of the
+  originals** (`5.mp4`, `7.mp4`). They are usable, since the originals are side views, but
+  no new side footage was filmed. Sample 7 had the same issue.
+- Deep Squat and Hurdle Step `Front view.mp4` are the originals renamed.
+- The genuinely new files are Deep Squat `side view .mp4`, Hurdle Step `side view.mp4`,
+  and ASLR and Rotary `front view .mp4`. **The trailing space is the only thing that
+  separates those two front views from the wrong-angle 13 Sep `front view.mp4` beside
+  them.**
+
+**Camera angles.** Same method as before, 60 sampled frames, plus a visual check:
+
+| Clip | hip/torso | Torso (1920 px) | Hip conf | Verdict |
+|---|---|---|---|---|
+| Deep Squat side | 0.09 | 233 | 0.70 | Genuine side view |
+| Hurdle Step side | 0.10 | 229 | 0.66 | Genuine side view |
+| Rotary front | 0.38 | 424 | 0.72 | Correct elevated view, matching the approved test clips |
+| ASLR front | 0.51 | 239 | 0.58 → **0.73 after fix** | Correct elevated view; tracking fixed, see below |
+
+**The ASLR tracking dip was not the turnaround.** The subject does turn around between
+legs, but that is a single facing flip lasting about 1 s (8.3–8.5 s). The poor tracking
+covered the whole first leg: 0–8.2 s, head left, lying still and fully visible, with 45%
+of frames losing the hips (0.08–0.26). The cause is RTMPose on a horizontal body; see
+§13 item 0. Fix: `orient_upright=True` for this clip's extraction. First-leg hips went
+from 0.34 / 43% usable to 0.75 / 100%, and the whole clip from 0.57 / 78% to 0.73 / 100%.
+The stored keypoints were checked by eye, including mid-leg-raise and after the
+turnaround. Rotary was extracted *without* it: as filmed it measured 0.72 against 0.68
+upright, because someone on hands and knees is not upright in either orientation.
+
+**Two bugs in the 17 Sep shoulder-lowering check, found on this clip:**
+1. **Orientation wrap.** The shoulder line was treated as a plain number in ±90°. From an
+   elevated camera behind the subject the line is near vertical in the image, so jitter
+   flipped it between +89° and −89° and read as **138.6°**. Fixed by unwrapping,
+   using a circular (doubled-angle) mean, and taking the shortest-turn deviation. S1 and
+   S7 shift slightly, 19.08 → 19.05 and 13.49 → 12.80, with no score change.
+2. **The threshold does not carry over to this camera placement.** After the fix S9 still
+   read 33.3°. The two approved elevated test clips of *normal* movement read 11.3° and
+   28.2°: this camera sees a larger normal arm-lift signature than the head-end views the
+   25° cut came from. Also, the subject turns around mid-clip, which moves the reference
+   angle. The frames at the 95th percentile show a correct bird-dog.
+
+   Checks now declare `front_views`, the camera placements their threshold was calibrated
+   on:
+   - Shoulder lowering: `axial` (head-end).
+   - Pelvic shift: `frontal`.
+
+   A good clip from any other placement gets `no_valid_measurement`. **Without this, S9
+   Rotary would have dropped 3 → 2 on a false `shoulder_lowering` fault.**
+
+**Sample 9, complete result.** Deep Squat and Hurdle Step are still scored from their
+original frontal clips: the new side views are verified but not wired into scoring,
+since that needs design.
+
+| Test | Score | Faults | Front-view checks |
+|---|---|---|---|
+| Deep Squat | 3 | none | — (ankle dorsiflexion, heel: `system_limit`) |
+| Hurdle Step | 2 | pelvis tilt 0.252 > 0.18, knee rotation 0.489 > 0.30 | — (ankles: `system_limit`) |
+| Inline Lunge | 3 | none | both `low_confidence`: the 13 Sep front clip tracks at 0.57, under 0.6 |
+| Shoulder Mobility | 1 | hands 2.29 hand lengths apart | — |
+| ASLR | 2 (final 2) | raised knee 153.1 < 155, opposite knee 103.8 < 160, opposite hip 165.3 < 170 | pelvis lift/rotation `no_valid_measurement`: footage now good, measurement not built |
+| Push-Up | 3 | none | hand position `system_limit` |
+| Rotary | 3 (final 3) | none | shoulder lowering and shoulder/pelvis rotation `no_valid_measurement` |
+
+Neutrality after all of the above, with front clips supplied to both sides of the
+comparison: **0 score, 0 fault, 0 side/final-score changes over 146 clips**. Suite 42 → 46.
+
+**Not done, needs a decision:** wiring the Deep Squat and Hurdle Step side views into
+scoring. Deep Squat trunk lean is dead on frontal footage and would come alive; knee depth
+would be more accurate. Also: validated pelvis measurements, now possible on Sample 9's
+footage; the Inline Lunge/ASLR department ranges, which are still not implemented; and
+calibrating shoulder lowering for the elevated view.
+
 ---
 
 ## 8. Validation: the 126-video batch
@@ -474,6 +548,10 @@ Score distribution:
    *straight*-leg raise, a 39.7° hip angle putting the leg past vertical. Near-certainly
    landmark tracking errors on a supine subject. Because they fall on the wrong side of a
    threshold they generate faults that did not happen.
+
+   **Possible explanation found 22 Sep 2026, untested on these clips:** RTMPose is unstable
+   on a person lying across the frame, and rotating the frame upright fixes it. See §13
+   item 0 (HIGH PRIORITY).
 
 ### Demo videos with real faults
 
@@ -1034,6 +1112,36 @@ once the department signs the numbers off — that is when the distinction start
 
 ### Known technical debt
 
+0. **HIGH PRIORITY — upright-oriented extraction for every horizontal-body clip. Not
+   started; do it as its own investigation.** Logged 22 Sep 2026.
+
+   *What was found.* Sample 9's new elevated ASLR front clip lost the hips on **45%** of the
+   frames where the subject lay head-left. Hip confidence fell to 0.08–0.26 and the
+   skeleton collapsed onto the head, while the subject lay still and fully visible. It was
+   not the mid-clip turnaround, which is a single facing flip lasting about 1 s
+   (8.3–8.5 s). Rotating those frames 90° so the head points up recovered **every one**,
+   to 0.68–0.79. The keypoints were mapped back onto the original frame and checked by
+   eye: hips at the waist, both legs traced, the raised leg followed to the foot. Cause:
+   RTMPose is trained on upright people.
+
+   *What was done.* `extract_video_pose(..., orient_upright=True)` picks the rotation per
+   frame from the previous frame's body axis. It costs one inference once settled and
+   tries all three orientations when uncertain. It is **used only for front-view
+   extraction**; the default is off, so no existing tracked data or score changed.
+
+   *Why this matters beyond Sample 9.* The ASLR, Push-Up and Rotary **side-view** clips for
+   all 18 samples also show a body lying across the frame. They average 0.70–0.77
+   confidence, so the problem does not show in averages. But §8 finding 4, a 42.7°
+   raised-knee angle in a straight-leg raise and a hip past vertical, is exactly what this
+   failure would produce. It may explain that long-standing mystery.
+
+   *What the investigation needs.* Re-extract every ASLR, Push-Up and Rotary side-view clip
+   with `orient_upright=True` into a separate directory. Compare confidence and
+   implausible-reading counts before and after. Then do a **full before/after re-score**
+   of all 126 videos, diffing the measurement dicts, and a visual check of any clip whose
+   score moves. Scores **will** change, and every change needs a reason before the new
+   extraction replaces `fms_outputs/tracked/`.
+
 7. **App froze during a multi-upload session — ERRORS FIXED AND VERIFIED; memory
    accumulation still open.**
 
@@ -1320,7 +1428,7 @@ once the department signs the numbers off — that is when the distinction start
    from plain PyPI; no `--extra-index-url` is needed.
 
 10. **Test coverage is thin — improved, still thin.** `test_fms_scoring.py` went from 3 to
-   **42 tests** with the threshold, side-splitting, declared-side and per-screening assessment work (sections 7 and 12), which now guard the declared
+   **46 tests** with the threshold, side-splitting, declared-side, per-screening assessment and upright-orientation work (sections 7 and 12), which now guard the declared
    thresholds against the scoring code and asserts that pending checks can never be
    evaluated. Still missing: per-fault behavioural coverage for
    the other six tests — only the deep squat's depth fault is exercised end to end — and
